@@ -1,0 +1,50 @@
+import { z } from 'zod';
+declare const envSchema: z.ZodObject<{
+    NODE_ENV: z.ZodDefault<z.ZodEnum<["development", "production", "test"]>>;
+    PORT: z.ZodDefault<z.ZodEffects<z.ZodString, number, string>>;
+    DATABASE_URL: z.ZodString;
+    DATABASE_URL_ESCRUTINIO: z.ZodOptional<z.ZodString>;
+    JWT_SECRET: z.ZodString;
+    JWT_EXPIRES_IN: z.ZodDefault<z.ZodString>;
+    COOKIE_SECRET: z.ZodString;
+    TOTP_SERVICE_NAME: z.ZodDefault<z.ZodString>;
+    FRONTEND_URL: z.ZodDefault<z.ZodString>;
+    REDIS_URL: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    TOTP_SERVICE_NAME: string;
+    NODE_ENV: "development" | "production" | "test";
+    PORT: number;
+    DATABASE_URL: string;
+    JWT_SECRET: string;
+    JWT_EXPIRES_IN: string;
+    COOKIE_SECRET: string;
+    FRONTEND_URL: string;
+    DATABASE_URL_ESCRUTINIO?: string | undefined;
+    REDIS_URL?: string | undefined;
+}, {
+    DATABASE_URL: string;
+    JWT_SECRET: string;
+    COOKIE_SECRET: string;
+    TOTP_SERVICE_NAME?: string | undefined;
+    NODE_ENV?: "development" | "production" | "test" | undefined;
+    PORT?: string | undefined;
+    DATABASE_URL_ESCRUTINIO?: string | undefined;
+    JWT_EXPIRES_IN?: string | undefined;
+    FRONTEND_URL?: string | undefined;
+    REDIS_URL?: string | undefined;
+}>;
+export type EnvConfig = z.infer<typeof envSchema>;
+export declare function validateEnv(): EnvConfig;
+export declare const env: {
+    TOTP_SERVICE_NAME: string;
+    NODE_ENV: "development" | "production" | "test";
+    PORT: number;
+    DATABASE_URL: string;
+    JWT_SECRET: string;
+    JWT_EXPIRES_IN: string;
+    COOKIE_SECRET: string;
+    FRONTEND_URL: string;
+    DATABASE_URL_ESCRUTINIO?: string | undefined;
+    REDIS_URL?: string | undefined;
+};
+export {};

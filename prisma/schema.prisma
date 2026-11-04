@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+enum EleccionEstado {
+  BORRADOR
+  ABIERTA
+  CERRADA
+  ESCRUTADA
+}
+
+enum PuestoEstado {
+  LIBRE
+  RESERVADO
+  FUERA_SERVICIO
+}
+
+enum ElectorEstado {
+  PENDIENTE
+  HABILITADO
+  VOTO
+}
+
+model Eleccion {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre          String         @db.VarChar(150)
+  descripcion     String?        @db.Text
+  estado          EleccionEstado @default(BORRADOR)
+  reglas          Json           @default("{\"blanco_en_porcentaje\":false,\"porcentaje_minimo_ganar\":50.0,\"segunda_vuelta\":false,\"cuantos_pasan_segunda_vuelta\":2,\"quorum_porcentaje\":0.0,\"accion_sin_quorum\":\"DECLARAR_DESIERTA\",\"regla_empate\":\"SORTEO\",\"duracion_reserva_segundos\":180,\"ip_restringida\":null}")
+  huella_sha256   String?        @db.VarChar(64)
+  created_at      DateTime       @default(now()) @db.Timestamptz
+  abierta_at      DateTime?      @db.Timestamptz
+  cerrada_at      DateTime?      @db.Timestamptz
+
+  aulas           Aula[]
+  docentes        Docente[]
+  partidos        Partido[]
+  electores       Elector[]
+  habilitaciones  Habilitacion[]
+  urnas           Urna[]
+  auditorias      AuditoriaLog[]
+  incidentes      Incidente[]
+  escrutinio      ResultadoEscrutinio?
+
+  @@map("eleccion")
+}
+
+model Aula {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id String   @db.Uuid
+  numero      Int
+  nombre      String   @db.VarChar(100)
+  capacidad   Int      @default(50)
+
+  eleccion    Eleccion @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  docentes    Docente[]
+  puestos     Puesto[]
+  electores   Elector[]
+  incidentes  Incidente[]
+
+  @@unique([eleccion_id, numero], name: "uq_aula_eleccion_numero")
+  @@map("aula")
+}
+
+model Docente {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aula_id       String   @db.Uuid
+  eleccion_id   String   @db.Uuid
+  username      String   @db.VarChar(50)
+  password_hash String   @db.VarChar(255)
+  totp_secret   String   @db.VarChar(64)
+  activo        Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  aula          Aula     @relation(fields: [aula_id], references: [id], onDelete: Restrict)
+  eleccion      Eleccion @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  incidentes    Incidente[]
+
+  @@unique([eleccion_id, username], name: "uq_docente_username_eleccion")
+  @@map("docente")
+}
+
+model Partido {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id  String    @db.Uuid
+  numero_lista Int
+  nombre       String    @db.VarChar(120)
+  lema         String?   @db.VarChar(255)
+  logo_url     String?   @db.Text
+
+  eleccion     Eleccion  @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  escrutinio   ResultadoEscrutinio[]
+
+  @@unique([eleccion_id, numero_lista], name: "uq_partido_eleccion_lista")
+  @@map("partido")
+}
+
+model Puesto {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aula_id          String       @db.Uuid
+  numero_puesto    Int
+  token_sesion     String?      @db.VarChar(64)
+  estado           PuestoEstado @default(FUERA_SERVICIO)
+  ultimo_heartbeat DateTime?    @db.Timestamptz
+
+  aula             Aula         @relation(fields: [aula_id], references: [id], onDelete: Cascade)
+  qr_codigos       QrEmparejamiento[]
+  habilitacion     Habilitacion?
+
+  @@unique([aula_id, numero_puesto], name: "uq_puesto_aula_numero")
+  @@map("puesto")
+}
+
+model QrEmparejamiento {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  puesto_id  String   @db.Uuid
+  token      String   @unique @db.VarChar(64)
+  expires_at DateTime @db.Timestamptz
+  usado      Boolean  @default(false)
+
+  puesto     Puesto   @relation(fields: [puesto_id], references: [id], onDelete: Cascade)
+
+  @@map("qr_emparejamiento")
+}
+
+model Elector {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id   String        @db.Uuid
+  aula_id       String        @db.Uuid
+  dni           String        @db.VarChar(15)
+  nombres       String        @db.VarChar(100)
+  apellidos     String        @db.VarChar(100)
+  grado_seccion String        @db.VarChar(50)
+  estado        ElectorEstado @default(PENDIENTE)
+
+  // INVARIANTE I3: Sin fecha de voto ni marca temporal
+  eleccion      Eleccion      @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  aula          Aula          @relation(fields: [aula_id], references: [id], onDelete: Restrict)
+  habilitacion  Habilitacion?
+
+  // INVARIANTE I1: Jamás relacionar con la Urna
+  @@unique([eleccion_id, dni], name: "uq_elector_dni_eleccion")
+  @@map("elector")
+}
+
+model Habilitacion {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id      String   @db.Uuid
+  elector_id       String   @unique @db.Uuid
+  puesto_id        String   @unique @db.Uuid
+  token_voto_hash  String   @unique @db.VarChar(64)
+  expires_at       DateTime @db.Timestamptz
+
+  eleccion         Eleccion @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  elector          Elector  @relation(fields: [elector_id], references: [id], onDelete: Cascade)
+  puesto           Puesto   @relation(fields: [puesto_id], references: [id], onDelete: Cascade)
+
+  // INVARIANTE I5: Transitoria, se borra al votar o expirar
+  @@map("habilitacion")
+}
+
+model Urna {
+  // INVARIANTE I2: Solo UUID v4 aleatorio, eleccion_id, voto_payload y schema_version.
+  // PROHIBIDO: created_at, elector_id, puesto_id, aula_id, docente_id, id autoincremental
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id    String   @db.Uuid
+  voto_payload   Json
+  schema_version String   @default("v1") @db.VarChar(10)
+
+  eleccion       Eleccion @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+
+  @@map("urna")
+}
+
+model AuditoriaLog {
+  id            BigInt   @id @default(autoincrement())
+  eleccion_id   String?  @db.Uuid
+  actor_tipo    String   @db.VarChar(20)
+  actor_id      String   @db.VarChar(64)
+  accion        String   @db.VarChar(50)
+  entidad       String   @db.VarChar(50)
+  entidad_id    String?  @db.VarChar(64)
+  datos_antes   Json?
+  datos_despues Json?
+  ip            String?  @db.VarChar(45)
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  eleccion      Eleccion? @relation(fields: [eleccion_id], references: [id], onDelete: SetNull)
+
+  // INVARIANTE I12: Jamás registra el voto ni relación elector-voto
+  @@map("auditoria_log")
+}
+
+model Incidente {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id String   @db.Uuid
+  aula_id     String?  @db.Uuid
+  docente_id  String?  @db.Uuid
+  tipo        String   @db.VarChar(50)
+  descripcion String   @db.Text
+  created_at  DateTime @default(now()) @db.Timestamptz
+
+  eleccion    Eleccion @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  aula        Aula?    @relation(fields: [aula_id], references: [id], onDelete: SetNull)
+  docente     Docente? @relation(fields: [docente_id], references: [id], onDelete: SetNull)
+
+  @@map("incidente")
+}
+
+model ResultadoEscrutinio {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id            String    @unique @db.Uuid
+  total_votos_urna       Int
+  total_electores_votaron Int
+  conteo_partidos        Json
+  porcentajes_calculados Json
+  ganador_partido_id     String?   @db.Uuid
+  requiere_segunda_vuelta Boolean   @default(false)
+  partidos_segunda_vuelta Json?
+  quorum_cumplido        Boolean
+  huella_verificada      Boolean
+  created_at             DateTime  @default(now()) @db.Timestamptz
+
+  eleccion               Eleccion  @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  ganador                Partido?  @relation(fields: [ganador_partido_id], references: [id], onDelete: SetNull)
+
+  @@map("resultado_escrutinio")
+}
+
