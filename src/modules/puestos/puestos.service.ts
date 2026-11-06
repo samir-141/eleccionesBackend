@@ -662,7 +662,7 @@ export class PuestosService {
 
     if (habilitacion) {
       nuevoEstado = 'RESERVADO';
-      token_voto = habilitacion.token_voto || this.tokensVotoPorPuesto.get(puestoId) || null;
+      token_voto = (habilitacion as any).token_voto || this.tokensVotoPorPuesto.get(puestoId) || null;
     } else {
       nuevoEstado = 'LIBRE';
       this.limpiarTokenVotoPuesto(puestoId);

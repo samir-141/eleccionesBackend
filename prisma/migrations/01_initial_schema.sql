@@ -105,6 +105,7 @@ CREATE TABLE habilitacion (
     elector_id UUID NOT NULL UNIQUE REFERENCES elector(id) ON DELETE CASCADE,
     puesto_id UUID NOT NULL UNIQUE REFERENCES puesto(id) ON DELETE CASCADE,
     token_voto_hash VARCHAR(64) NOT NULL UNIQUE,
+    token_voto VARCHAR(128),
     expires_at TIMESTAMPTZ NOT NULL
 );
 
