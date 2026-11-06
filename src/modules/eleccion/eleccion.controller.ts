@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Ip,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { EleccionService } from './eleccion.service';
 import { CreateEleccionDto } from './dto/create-eleccion.dto';
+import { UpdateEleccionDto } from './dto/update-eleccion.dto';
 import { UpdateReglasDto } from './dto/update-reglas.dto';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 
@@ -42,6 +44,25 @@ export class EleccionController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.eleccionService.findOne(id);
+  }
+
+  @Put(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateEleccionDto,
+    @Ip() ip: string,
+    @Headers('x-actor-id') actorId = 'admin',
+  ) {
+    return this.eleccionService.update(id, dto, actorId, ip);
+  }
+
+  @Delete(':id')
+  async remove(
+    @Param('id') id: string,
+    @Ip() ip: string,
+    @Headers('x-actor-id') actorId = 'admin',
+  ) {
+    return this.eleccionService.remove(id, actorId, ip);
   }
 
   @Get(':id/precondiciones')

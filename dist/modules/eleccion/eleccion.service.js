@@ -133,6 +133,94 @@ let EleccionService = class EleccionService {
         });
         return this.findOne(eleccion.id);
     }
+    async update(id, dto, actorId = 'admin', ip = '127.0.0.1') {
+        const eleccion = await this.prisma.eleccion.findUnique({
+            where: { id },
+        });
+        if (!eleccion) {
+            throw new common_1.NotFoundException(`Elección con ID ${id} no encontrada`);
+        }
+        const data = {};
+        if (dto.nombre !== undefined && dto.nombre.trim())
+            data.nombre = dto.nombre.trim();
+        if (dto.descripcion !== undefined)
+            data.descripcion = dto.descripcion.trim();
+        const actualizada = await this.prisma.eleccion.update({
+            where: { id },
+            data,
+            include: {
+                aulas: true,
+                partidos: { orderBy: { numero_lista: 'asc' } },
+                _count: {
+                    select: {
+                        electores: true,
+                        docentes: true,
+                        urnas: true,
+                    },
+                },
+            },
+        });
+        await this.auditoria.registrar({
+            eleccion_id: id,
+            actor_tipo: 'ADMIN',
+            actor_id: actorId,
+            accion: 'EDITAR_DATOS_ELECCION',
+            entidad: 'eleccion',
+            entidad_id: id,
+            datos_antes: { nombre: eleccion.nombre, descripcion: eleccion.descripcion },
+            datos_despues: { nombre: actualizada.nombre, descripcion: actualizada.descripcion },
+            ip,
+        });
+        return actualizada;
+    }
+    async remove(id, actorId = 'admin', ip = '127.0.0.1') {
+        const eleccion = await this.prisma.eleccion.findUnique({
+            where: { id },
+        });
+        if (!eleccion) {
+            throw new common_1.NotFoundException(`Elección con ID ${id} no encontrada`);
+        }
+        if (eleccion.estado === 'ABIERTA') {
+            throw new common_1.BadRequestException('No es posible eliminar una elección en curso (ABIERTA). Debe cerrarla previamente antes de eliminarla.');
+        }
+        await this.prisma.$transaction(async (tx) => {
+            await tx.habilitacion.deleteMany({ where: { eleccion_id: id } });
+            await tx.resultadoEscrutinio.deleteMany({ where: { eleccion_id: id } });
+            await tx.urna.deleteMany({ where: { eleccion_id: id } });
+            await tx.incidente.deleteMany({ where: { eleccion_id: id } });
+            const aulas = await tx.aula.findMany({
+                where: { eleccion_id: id },
+                select: { id: true },
+            });
+            const aulaIds = aulas.map((a) => a.id);
+            if (aulaIds.length > 0) {
+                const puestos = await tx.puesto.findMany({
+                    where: { aula_id: { in: aulaIds } },
+                    select: { id: true },
+                });
+                const puestoIds = puestos.map((p) => p.id);
+                if (puestoIds.length > 0) {
+                    await tx.qrEmparejamiento.deleteMany({
+                        where: { puesto_id: { in: puestoIds } },
+                    });
+                    await tx.puesto.deleteMany({
+                        where: { id: { in: puestoIds } },
+                    });
+                }
+            }
+            await tx.elector.deleteMany({ where: { eleccion_id: id } });
+            await tx.docente.deleteMany({ where: { eleccion_id: id } });
+            await tx.partido.deleteMany({ where: { eleccion_id: id } });
+            await tx.aula.deleteMany({ where: { eleccion_id: id } });
+            await tx.auditoriaLog.deleteMany({ where: { eleccion_id: id } });
+            await tx.eleccion.delete({ where: { id } });
+        });
+        return {
+            success: true,
+            message: `Elección "${eleccion.nombre}" eliminada exitosamente junto con todos sus registros asociados.`,
+            id,
+        };
+    }
     async findAll() {
         return this.prisma.eleccion.findMany({
             orderBy: { created_at: 'desc' },

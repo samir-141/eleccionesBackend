@@ -1,6 +1,7 @@
 import { PrismaService } from '../../database/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateEleccionDto } from './dto/create-eleccion.dto';
+import { UpdateEleccionDto } from './dto/update-eleccion.dto';
 import { UpdateReglasDto } from './dto/update-reglas.dto';
 export declare class EleccionService {
     private readonly prisma;
@@ -37,6 +38,43 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+    }>;
+    update(id: string, dto: UpdateEleccionDto, actorId?: string, ip?: string): Promise<{
+        aulas: {
+            id: string;
+            eleccion_id: string;
+            nombre: string;
+            numero: number;
+            capacidad: number;
+        }[];
+        partidos: {
+            id: string;
+            eleccion_id: string;
+            nombre: string;
+            numero_lista: number;
+            lema: string | null;
+            logo_url: string | null;
+        }[];
+        _count: {
+            docentes: number;
+            electores: number;
+            urnas: number;
+        };
+    } & {
+        id: string;
+        created_at: Date;
+        nombre: string;
+        descripcion: string | null;
+        estado: import(".prisma/client").$Enums.EleccionEstado;
+        reglas: import("@prisma/client/runtime/library").JsonValue;
+        huella_sha256: string | null;
+        abierta_at: Date | null;
+        cerrada_at: Date | null;
+    }>;
+    remove(id: string, actorId?: string, ip?: string): Promise<{
+        success: boolean;
+        message: string;
+        id: string;
     }>;
     findAll(): Promise<({
         _count: {

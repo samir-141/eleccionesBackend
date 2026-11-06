@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateEleccionDto } from './dto/create-eleccion.dto';
+import { UpdateEleccionDto } from './dto/update-eleccion.dto';
 import { UpdateReglasDto } from './dto/update-reglas.dto';
 import * as crypto from 'crypto';
 import * as argon2 from 'argon2';
@@ -144,6 +145,122 @@ export class EleccionService {
     });
 
     return this.findOne(eleccion.id);
+  }
+
+  async update(id: string, dto: UpdateEleccionDto, actorId = 'admin', ip = '127.0.0.1') {
+    const eleccion = await this.prisma.eleccion.findUnique({
+      where: { id },
+    });
+    if (!eleccion) {
+      throw new NotFoundException(`Elección con ID ${id} no encontrada`);
+    }
+
+    const data: { nombre?: string; descripcion?: string } = {};
+    if (dto.nombre !== undefined && dto.nombre.trim()) data.nombre = dto.nombre.trim();
+    if (dto.descripcion !== undefined) data.descripcion = dto.descripcion.trim();
+
+    const actualizada = await this.prisma.eleccion.update({
+      where: { id },
+      data,
+      include: {
+        aulas: true,
+        partidos: { orderBy: { numero_lista: 'asc' } },
+        _count: {
+          select: {
+            electores: true,
+            docentes: true,
+            urnas: true,
+          },
+        },
+      },
+    });
+
+    await this.auditoria.registrar({
+      eleccion_id: id,
+      actor_tipo: 'ADMIN',
+      actor_id: actorId,
+      accion: 'EDITAR_DATOS_ELECCION',
+      entidad: 'eleccion',
+      entidad_id: id,
+      datos_antes: { nombre: eleccion.nombre, descripcion: eleccion.descripcion },
+      datos_despues: { nombre: actualizada.nombre, descripcion: actualizada.descripcion },
+      ip,
+    });
+
+    return actualizada;
+  }
+
+  async remove(id: string, actorId = 'admin', ip = '127.0.0.1') {
+    const eleccion = await this.prisma.eleccion.findUnique({
+      where: { id },
+    });
+
+    if (!eleccion) {
+      throw new NotFoundException(`Elección con ID ${id} no encontrada`);
+    }
+
+    if (eleccion.estado === 'ABIERTA') {
+      throw new BadRequestException(
+        'No es posible eliminar una elección en curso (ABIERTA). Debe cerrarla previamente antes de eliminarla.',
+      );
+    }
+
+    // Ejecutar borrado en orden estricto dentro de una transacción para evitar violaciones de clave foránea Restrict
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Habilitaciones activas
+      await tx.habilitacion.deleteMany({ where: { eleccion_id: id } });
+
+      // 2. Escrutinio y Urnas (votos)
+      await tx.resultadoEscrutinio.deleteMany({ where: { eleccion_id: id } });
+      await tx.urna.deleteMany({ where: { eleccion_id: id } });
+
+      // 3. Incidentes
+      await tx.incidente.deleteMany({ where: { eleccion_id: id } });
+
+      // 4. Puestos y QR de emparejamiento asociados a las aulas de esta elección
+      const aulas = await tx.aula.findMany({
+        where: { eleccion_id: id },
+        select: { id: true },
+      });
+      const aulaIds = aulas.map((a) => a.id);
+
+      if (aulaIds.length > 0) {
+        const puestos = await tx.puesto.findMany({
+          where: { aula_id: { in: aulaIds } },
+          select: { id: true },
+        });
+        const puestoIds = puestos.map((p) => p.id);
+
+        if (puestoIds.length > 0) {
+          await tx.qrEmparejamiento.deleteMany({
+            where: { puesto_id: { in: puestoIds } },
+          });
+          await tx.puesto.deleteMany({
+            where: { id: { in: puestoIds } },
+          });
+        }
+      }
+
+      // 5. Electores y Docentes (tienen FK con onDelete: Restrict hacia aula)
+      await tx.elector.deleteMany({ where: { eleccion_id: id } });
+      await tx.docente.deleteMany({ where: { eleccion_id: id } });
+
+      // 6. Partidos y Aulas
+      await tx.partido.deleteMany({ where: { eleccion_id: id } });
+      await tx.aula.deleteMany({ where: { eleccion_id: id } });
+
+      // 7. Logs de auditoría de esta elección
+      await tx.auditoriaLog.deleteMany({ where: { eleccion_id: id } });
+
+      // 8. Elección final
+      await tx.eleccion.delete({ where: { id } });
+    });
+
+    return {
+      success: true,
+      message: `Elección "${eleccion.nombre}" eliminada exitosamente junto con todos sus registros asociados.`,
+      id,
+    };
   }
 
   async findAll() {

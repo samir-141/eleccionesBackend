@@ -16,6 +16,7 @@ exports.EleccionController = void 0;
 const common_1 = require("@nestjs/common");
 const eleccion_service_1 = require("./eleccion.service");
 const create_eleccion_dto_1 = require("./dto/create-eleccion.dto");
+const update_eleccion_dto_1 = require("./dto/update-eleccion.dto");
 const update_reglas_dto_1 = require("./dto/update-reglas.dto");
 const auditoria_service_1 = require("../auditoria/auditoria.service");
 let EleccionController = class EleccionController {
@@ -36,6 +37,12 @@ let EleccionController = class EleccionController {
     }
     async findOne(id) {
         return this.eleccionService.findOne(id);
+    }
+    async update(id, dto, ip, actorId = 'admin') {
+        return this.eleccionService.update(id, dto, actorId, ip);
+    }
+    async remove(id, ip, actorId = 'admin') {
+        return this.eleccionService.remove(id, actorId, ip);
     }
     async validarPrecondiciones(id) {
         return this.eleccionService.validarPrecondicionesApertura(id);
@@ -91,6 +98,25 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], EleccionController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.Put)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Ip)()),
+    __param(3, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, update_eleccion_dto_1.UpdateEleccionDto, String, Object]),
+    __metadata("design:returntype", Promise)
+], EleccionController.prototype, "update", null);
+__decorate([
+    (0, common_1.Delete)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Ip)()),
+    __param(2, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], EleccionController.prototype, "remove", null);
 __decorate([
     (0, common_1.Get)(':id/precondiciones'),
     __param(0, (0, common_1.Param)('id')),
