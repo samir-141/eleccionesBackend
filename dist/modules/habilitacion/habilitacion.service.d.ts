@@ -17,7 +17,7 @@ export declare class HabilitacionService {
         grado_seccion: string;
         aula_nombre: string;
     }>;
-    confirmarHabilitacion(rawDocenteAulaId: string, docenteId: string, electorId: string, ip?: string): Promise<{
+    confirmarHabilitacion(rawDocenteAulaId: string, docenteId: string, electorId: string, puestoIdDeseado?: string, ip?: string): Promise<{
         status: string;
         puesto_id: string;
         puesto_numero: number;

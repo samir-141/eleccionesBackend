@@ -4,6 +4,7 @@ export declare class ConsultarDniDto {
 }
 export declare class ConfirmarHabilitacionDto {
     elector_id: string;
+    puesto_id?: string;
 }
 export declare class CancelarHabilitacionDto {
     elector_id: string;

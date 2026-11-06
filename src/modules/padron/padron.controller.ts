@@ -47,5 +47,14 @@ export class PadronController {
   async pantallaPuerta(@Param('aulaId') aulaId: string) {
     return this.padronService.obtenerParaPantallaPuerta(aulaId);
   }
+
+  /**
+   * Vista de Salón para el Docente de Aula:
+   * Muestra sus alumnos, estado (VOTÓ / PENDIENTE) y avance de la mesa.
+   */
+  @Get('api/docente/aula/:aulaId/salon')
+  async obtenerSalonDocente(@Param('aulaId') aulaId: string) {
+    return this.padronService.obtenerSalonDocente(aulaId);
+  }
 }
 

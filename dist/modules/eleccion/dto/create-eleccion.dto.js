@@ -14,6 +14,9 @@ const class_validator_1 = require("class-validator");
 class CreateEleccionDto {
     nombre;
     descripcion;
+    clonarConfiguracion;
+    clonarPadron;
+    eleccionOrigenId;
 }
 exports.CreateEleccionDto = CreateEleccionDto;
 __decorate([
@@ -28,4 +31,19 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateEleccionDto.prototype, "descripcion", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateEleccionDto.prototype, "clonarConfiguracion", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateEleccionDto.prototype, "clonarPadron", void 0);
+__decorate([
+    (0, class_validator_1.IsUUID)('4', { message: 'El ID de la elección origen debe ser un UUID válido' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateEleccionDto.prototype, "eleccionOrigenId", void 0);
 //# sourceMappingURL=create-eleccion.dto.js.map

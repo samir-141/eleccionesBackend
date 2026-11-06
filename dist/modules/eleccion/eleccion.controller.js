@@ -52,6 +52,12 @@ let EleccionController = class EleccionController {
     async cerrar(id, ip, actorId = 'admin') {
         return this.eleccionService.cerrarEleccion(id, actorId, ip);
     }
+    async reaperturar(id, ip, actorId = 'admin') {
+        return this.eleccionService.reaperturarEleccion(id, actorId, ip);
+    }
+    async crearNueva(dto, ip, actorId = 'admin') {
+        return this.eleccionService.create(dto, actorId, ip);
+    }
     async getAuditoria(id) {
         return this.auditoriaService.obtenerPorEleccion(id);
     }
@@ -129,6 +135,24 @@ __decorate([
     __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", Promise)
 ], EleccionController.prototype, "cerrar", null);
+__decorate([
+    (0, common_1.Post)(':id/reaperturar'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Ip)()),
+    __param(2, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], EleccionController.prototype, "reaperturar", null);
+__decorate([
+    (0, common_1.Post)('nueva'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Ip)()),
+    __param(2, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [create_eleccion_dto_1.CreateEleccionDto, String, Object]),
+    __metadata("design:returntype", Promise)
+], EleccionController.prototype, "crearNueva", null);
 __decorate([
     (0, common_1.Get)(':id/auditoria'),
     __param(0, (0, common_1.Param)('id')),

@@ -31,7 +31,7 @@ let HabilitacionController = class HabilitacionController {
         if (!docenteAulaId) {
             throw new common_1.BadRequestException('Cabecera x-docente-aula-id requerida para operar en el aula.');
         }
-        return this.habilitacionService.confirmarHabilitacion(docenteAulaId, actorId, dto.elector_id, ip);
+        return this.habilitacionService.confirmarHabilitacion(docenteAulaId, actorId, dto.elector_id, dto.puesto_id, ip);
     }
     async cancelar(dto, docenteAulaId, actorId = 'docente', ip) {
         if (!docenteAulaId) {

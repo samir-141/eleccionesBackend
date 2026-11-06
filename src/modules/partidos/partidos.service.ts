@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ConflictException, NotFoundException }
 import { PrismaService } from '../../database/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreatePartidoDto } from './dto/create-partido.dto';
+import { UpdatePartidoDto } from './dto/update-partido.dto';
 
 @Injectable()
 export class PartidosService {
@@ -51,11 +52,108 @@ export class PartidosService {
     return partido;
   }
 
+  async actualizarPartido(
+    id: string,
+    dto: UpdatePartidoDto,
+    actorId = 'admin',
+    ip = '127.0.0.1',
+  ) {
+    const partido = await this.prisma.partido.findUnique({
+      where: { id },
+      include: { eleccion: true },
+    });
+    if (!partido) {
+      throw new NotFoundException(`Partido con ID ${id} no encontrado`);
+    }
+
+    if (partido.eleccion.estado !== 'BORRADOR') {
+      throw new BadRequestException(
+        `No se pueden editar partidos en una elección que está en estado ${partido.eleccion.estado}.`,
+      );
+    }
+
+    if (dto.numero_lista && dto.numero_lista !== partido.numero_lista) {
+      const duplicado = await this.prisma.partido.findFirst({
+        where: {
+          eleccion_id: partido.eleccion_id,
+          numero_lista: dto.numero_lista,
+          id: { not: id },
+        },
+      });
+      if (duplicado) {
+        throw new ConflictException(`Ya existe otra lista con el número ${dto.numero_lista}.`);
+      }
+    }
+
+    const actualizado = await this.prisma.partido.update({
+      where: { id },
+      data: {
+        ...(dto.numero_lista !== undefined ? { numero_lista: dto.numero_lista } : {}),
+        ...(dto.nombre ? { nombre: dto.nombre } : {}),
+        ...(dto.lema !== undefined ? { lema: dto.lema } : {}),
+        ...(dto.logo_url !== undefined ? { logo_url: dto.logo_url } : {}),
+      },
+    });
+
+    await this.auditoria.registrar({
+      eleccion_id: partido.eleccion_id,
+      actor_tipo: 'ADMIN',
+      actor_id: actorId,
+      accion: 'ACTUALIZAR_PARTIDO',
+      entidad: 'partido',
+      entidad_id: id,
+      datos_antes: partido,
+      datos_despues: actualizado,
+      ip,
+    });
+
+    return actualizado;
+  }
+
+  async eliminarPartido(id: string, actorId = 'admin', ip = '127.0.0.1') {
+    const partido = await this.prisma.partido.findUnique({
+      where: { id },
+      include: { eleccion: true },
+    });
+    if (!partido) {
+      throw new NotFoundException(`Partido con ID ${id} no encontrado`);
+    }
+
+    if (partido.eleccion.estado !== 'BORRADOR') {
+      throw new BadRequestException('Solo se pueden eliminar partidos si la elección está en estado BORRADOR.');
+    }
+
+    await this.prisma.partido.delete({ where: { id } });
+
+    await this.auditoria.registrar({
+      eleccion_id: partido.eleccion_id,
+      actor_tipo: 'ADMIN',
+      actor_id: actorId,
+      accion: 'ELIMINAR_PARTIDO',
+      entidad: 'partido',
+      entidad_id: id,
+      datos_antes: partido,
+      ip,
+    });
+
+    return { ok: true, id };
+  }
+
   async listarPorEleccion(eleccionId: string) {
     return this.prisma.partido.findMany({
       where: { eleccion_id: eleccionId },
       orderBy: { numero_lista: 'asc' },
     });
+  }
+
+  async listarActivos() {
+    const activa = await this.prisma.eleccion.findFirst({
+      where: { estado: 'ABIERTA' },
+      orderBy: { created_at: 'desc' },
+    });
+    const eleccion = activa || (await this.prisma.eleccion.findFirst({ orderBy: { created_at: 'desc' } }));
+    if (!eleccion) return [];
+    return this.listarPorEleccion(eleccion.id);
   }
 
   /**

@@ -11,6 +11,15 @@ export declare class DocentesController {
             numero: number;
         };
         totp_secret: string;
+        qr_setup_data_url?: undefined;
+    } | {
+        id: string;
+        username: string;
+        aula: {
+            nombre: string;
+            numero: number;
+        };
+        totp_secret: string;
         qr_setup_data_url: string;
     }>;
     listar(eleccionId: string): Promise<{
@@ -24,6 +33,16 @@ export declare class DocentesController {
         username: string;
         activo: boolean;
     }[]>;
+    eliminar(id: string, ip: string, actorId?: string): Promise<{
+        mensaje: string;
+    }>;
+    desvincularDocenteAula(aulaId: string, ip: string, actorId?: string): Promise<{
+        mensaje: string;
+        count?: undefined;
+    } | {
+        mensaje: string;
+        count: number;
+    }>;
     login(dto: LoginDocenteDto, ip: string): Promise<{
         docente_id: string;
         username: string;

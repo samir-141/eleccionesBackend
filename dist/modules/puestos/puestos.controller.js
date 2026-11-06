@@ -41,6 +41,12 @@ let PuestosController = class PuestosController {
     async emparejar(dto, docenteAulaId, actorId = 'docente', ip) {
         return this.puestosService.emparejarConQr(docenteAulaId, dto.token_qr, actorId, ip);
     }
+    async autorizarMaquinaAdmin(aulaId, body, actorId = 'admin', ip) {
+        return this.puestosService.emparejarPuestoAdmin(aulaId, body.token_qr, body.numero_puesto, actorId, ip);
+    }
+    async agregarPuestoAdmin(aulaId, actorId = 'admin', ip) {
+        return this.puestosService.agregarPuestoAula(aulaId, actorId, ip);
+    }
     async heartbeat(dto) {
         return this.puestosService.registrarHeartbeat(dto.token_sesion);
     }
@@ -97,6 +103,25 @@ __decorate([
     __metadata("design:paramtypes", [puestos_dto_1.EmparejarPuestoDto, String, Object, String]),
     __metadata("design:returntype", Promise)
 ], PuestosController.prototype, "emparejar", null);
+__decorate([
+    (0, common_1.Post)('api/admin/aulas/:aulaId/puestos/autorizar-maquina'),
+    __param(0, (0, common_1.Param)('aulaId')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Headers)('x-actor-id')),
+    __param(3, (0, common_1.Ip)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object, String]),
+    __metadata("design:returntype", Promise)
+], PuestosController.prototype, "autorizarMaquinaAdmin", null);
+__decorate([
+    (0, common_1.Post)('api/admin/aulas/:aulaId/puestos'),
+    __param(0, (0, common_1.Param)('aulaId')),
+    __param(1, (0, common_1.Headers)('x-actor-id')),
+    __param(2, (0, common_1.Ip)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, String]),
+    __metadata("design:returntype", Promise)
+], PuestosController.prototype, "agregarPuestoAdmin", null);
 __decorate([
     (0, common_1.Post)('api/puesto/heartbeat'),
     __param(0, (0, common_1.Body)()),

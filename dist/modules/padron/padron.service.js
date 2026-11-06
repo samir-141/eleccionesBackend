@@ -212,6 +212,44 @@ let PadronService = class PadronService {
             electores,
         };
     }
+    async obtenerSalonDocente(aulaId) {
+        const aula = await this.prisma.aula.findUnique({
+            where: { id: aulaId },
+            include: {
+                eleccion: { select: { nombre: true, estado: true } },
+            },
+        });
+        if (!aula) {
+            throw new common_1.NotFoundException(`Aula con ID ${aulaId} no encontrada`);
+        }
+        const electores = await this.prisma.elector.findMany({
+            where: { aula_id: aulaId },
+            select: {
+                id: true,
+                dni: true,
+                nombres: true,
+                apellidos: true,
+                grado_seccion: true,
+                estado: true,
+            },
+            orderBy: [{ apellidos: 'asc' }, { nombres: 'asc' }],
+        });
+        const totalAsignados = electores.length;
+        const totalVotaron = electores.filter((e) => e.estado === 'VOTO').length;
+        const totalPendientes = totalAsignados - totalVotaron;
+        return {
+            aula: {
+                id: aula.id,
+                numero: aula.numero,
+                nombre: aula.nombre,
+            },
+            total_asignados: totalAsignados,
+            total_votaron: totalVotaron,
+            total_pendientes: totalPendientes,
+            porcentaje_avance: totalAsignados > 0 ? Number(((totalVotaron / totalAsignados) * 100).toFixed(1)) : 0,
+            electores,
+        };
+    }
 };
 exports.PadronService = PadronService;
 exports.PadronService = PadronService = __decorate([

@@ -16,6 +16,10 @@ export class ConfirmarHabilitacionDto {
   @IsString()
   @IsNotEmpty()
   elector_id!: string;
+
+  @IsString()
+  @IsOptional()
+  puesto_id?: string;
 }
 
 export class CancelarHabilitacionDto {

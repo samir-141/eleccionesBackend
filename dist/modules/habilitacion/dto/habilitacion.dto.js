@@ -30,6 +30,7 @@ __decorate([
 ], ConsultarDniDto.prototype, "origen_lectura", void 0);
 class ConfirmarHabilitacionDto {
     elector_id;
+    puesto_id;
 }
 exports.ConfirmarHabilitacionDto = ConfirmarHabilitacionDto;
 __decorate([
@@ -37,6 +38,11 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], ConfirmarHabilitacionDto.prototype, "elector_id", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], ConfirmarHabilitacionDto.prototype, "puesto_id", void 0);
 class CancelarHabilitacionDto {
     elector_id;
     motivo;

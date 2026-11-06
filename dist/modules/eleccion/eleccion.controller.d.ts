@@ -7,6 +7,27 @@ export declare class EleccionController {
     private readonly auditoriaService;
     constructor(eleccionService: EleccionService, auditoriaService: AuditoriaService);
     create(dto: CreateEleccionDto, ip: string, actorId?: string): Promise<{
+        aulas: {
+            id: string;
+            eleccion_id: string;
+            nombre: string;
+            numero: number;
+            capacidad: number;
+        }[];
+        partidos: {
+            id: string;
+            eleccion_id: string;
+            nombre: string;
+            numero_lista: number;
+            lema: string | null;
+            logo_url: string | null;
+        }[];
+        _count: {
+            docentes: number;
+            electores: number;
+            urnas: number;
+        };
+    } & {
         id: string;
         created_at: Date;
         nombre: string;
@@ -196,6 +217,49 @@ export declare class EleccionController {
         cerrada_at: Date | null;
     }>;
     cerrar(id: string, ip: string, actorId?: string): Promise<{
+        id: string;
+        created_at: Date;
+        nombre: string;
+        descripcion: string | null;
+        estado: import(".prisma/client").$Enums.EleccionEstado;
+        reglas: import("@prisma/client/runtime/library").JsonValue;
+        huella_sha256: string | null;
+        abierta_at: Date | null;
+        cerrada_at: Date | null;
+    }>;
+    reaperturar(id: string, ip: string, actorId?: string): Promise<{
+        id: string;
+        created_at: Date;
+        nombre: string;
+        descripcion: string | null;
+        estado: import(".prisma/client").$Enums.EleccionEstado;
+        reglas: import("@prisma/client/runtime/library").JsonValue;
+        huella_sha256: string | null;
+        abierta_at: Date | null;
+        cerrada_at: Date | null;
+    }>;
+    crearNueva(dto: CreateEleccionDto, ip: string, actorId?: string): Promise<{
+        aulas: {
+            id: string;
+            eleccion_id: string;
+            nombre: string;
+            numero: number;
+            capacidad: number;
+        }[];
+        partidos: {
+            id: string;
+            eleccion_id: string;
+            nombre: string;
+            numero_lista: number;
+            lema: string | null;
+            logo_url: string | null;
+        }[];
+        _count: {
+            docentes: number;
+            electores: number;
+            urnas: number;
+        };
+    } & {
         id: string;
         created_at: Date;
         nombre: string;

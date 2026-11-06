@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, MaxLength, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, MaxLength, MinLength, IsBoolean, IsUUID } from 'class-validator';
 
 export class CreateEleccionDto {
   @IsString()
@@ -10,5 +10,18 @@ export class CreateEleccionDto {
   @IsString()
   @IsOptional()
   descripcion?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  clonarConfiguracion?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  clonarPadron?: boolean;
+
+  @IsUUID('4', { message: 'El ID de la elección origen debe ser un UUID válido' })
+  @IsOptional()
+  eleccionOrigenId?: string;
 }
+
 

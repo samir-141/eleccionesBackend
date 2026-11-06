@@ -10,10 +10,24 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import * as crypto from 'crypto';
 import * as QRCode from 'qrcode';
 
+interface MaquinaPendiente {
+  token: string;
+  codigoCorto: string;
+  expires_at: Date;
+  usado: boolean;
+  puesto_id?: string;
+  aula_id?: string;
+  aula_nombre?: string;
+  numero_puesto?: number;
+  token_sesion?: string;
+}
+
 @Injectable()
 export class PuestosService {
   // In-memory cache de tokens de voto efímeros asignados al puesto (Invariante I10)
   private tokensVotoPorPuesto = new Map<string, string>();
+  // Registro en memoria de máquinas esperando ser escaneadas y asignadas a una mesa
+  private maquinasPendientes = new Map<string, MaquinaPendiente>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -34,9 +48,43 @@ export class PuestosService {
 
   /**
    * Puesto (Laptop/Tablet): Solicita un QR de emparejamiento efímero.
-   * ADR-005: El QR expira en minutos y se consume en un solo uso.
+   * Sin datos predeterminados: Toma lugar en la mesa recién cuando se escanea el código.
    */
-  async solicitarEmparejamiento(aulaId: string, numeroPuesto: number) {
+  async solicitarEmparejamiento(aulaId?: string, numeroPuesto?: number) {
+    if (!aulaId) {
+      // Flujo dinámico: La máquina no tiene aula ni puesto predeterminado.
+      // Toma lugar recién cuando el docente o administrador escanea su código.
+      const token = crypto.randomBytes(24).toString('hex');
+      const codigoCorto = 'MQ-' + token.substring(0, 4).toUpperCase();
+      const expires_at = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+
+      const maquina: MaquinaPendiente = {
+        token,
+        codigoCorto,
+        expires_at,
+        usado: false,
+      };
+
+      this.maquinasPendientes.set(token, maquina);
+      this.maquinasPendientes.set(codigoCorto, maquina);
+
+      const qr_data_url = await QRCode.toDataURL(token, {
+        errorCorrectionLevel: 'M',
+        margin: 2,
+        width: 480,
+      });
+
+      return {
+        puesto_id: '',
+        numero_puesto: 0,
+        aula: 'Sin Asignar (Esperando Escaneo)',
+        qr_token: token,
+        codigo_corto: codigoCorto,
+        qr_data_url,
+        expires_at,
+      };
+    }
+
     const aula = await this.prisma.aula.findUnique({ where: { id: aulaId } });
     if (!aula) {
       throw new NotFoundException(`Aula con ID ${aulaId} no encontrada`);
@@ -44,14 +92,14 @@ export class PuestosService {
 
     // Buscar o registrar el puesto en la base de datos
     let puesto = await this.prisma.puesto.findFirst({
-      where: { aula_id: aulaId, numero_puesto: numeroPuesto },
+      where: { aula_id: aulaId, numero_puesto: numeroPuesto || 1 },
     });
 
     if (!puesto) {
       puesto = await this.prisma.puesto.create({
         data: {
           aula_id: aulaId,
-          numero_puesto: numeroPuesto,
+          numero_puesto: numeroPuesto || 1,
           estado: 'FUERA_SERVICIO',
         },
       });
@@ -59,7 +107,7 @@ export class PuestosService {
 
     // Generar token efímero seguro
     const token = crypto.randomBytes(32).toString('hex');
-    const expires_at = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos de vigencia
+    const expires_at = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos de vigencia
 
     await this.prisma.qrEmparejamiento.create({
       data: {
@@ -82,6 +130,7 @@ export class PuestosService {
       numero_puesto: puesto.numero_puesto,
       aula: aula.nombre,
       qr_token: token,
+      codigo_corto: 'MQ-' + token.substring(0, 4).toUpperCase(),
       qr_data_url,
       expires_at,
     };
@@ -104,8 +153,75 @@ export class PuestosService {
       if (aulaFallback) resolvedAulaId = aulaFallback.id;
     }
 
+    const tokenLimpio = tokenQr.trim();
+
+    // 1. Flujo Dinámico: La máquina no tenía mesa predeterminada y toma lugar recién al escanearse
+    if (this.maquinasPendientes.has(tokenLimpio)) {
+      const maquina = this.maquinasPendientes.get(tokenLimpio)!;
+      if (maquina.usado) {
+        throw new BadRequestException('Esta máquina ya fue autorizada y asignada a una mesa.');
+      }
+      if (maquina.expires_at < new Date()) {
+        throw new BadRequestException('El código QR de la máquina ha expirado. Genere uno nuevo.');
+      }
+
+      const aula = await this.prisma.aula.findUnique({ where: { id: resolvedAulaId } });
+      if (!aula) {
+        throw new NotFoundException(`Aula con ID ${resolvedAulaId} no encontrada`);
+      }
+
+      const maxPuesto = await this.prisma.puesto.aggregate({
+        where: { aula_id: resolvedAulaId },
+        _max: { numero_puesto: true },
+      });
+      const siguienteNumero = (maxPuesto._max.numero_puesto || 0) + 1;
+
+      const token_sesion = crypto.randomUUID();
+      const nuevoPuesto = await this.prisma.puesto.create({
+        data: {
+          aula_id: resolvedAulaId,
+          numero_puesto: siguienteNumero,
+          estado: 'LIBRE',
+          token_sesion,
+          ultimo_heartbeat: new Date(),
+        },
+      });
+
+      maquina.usado = true;
+      maquina.puesto_id = nuevoPuesto.id;
+      maquina.aula_id = aula.id;
+      maquina.aula_nombre = aula.nombre;
+      maquina.numero_puesto = nuevoPuesto.numero_puesto;
+      maquina.token_sesion = token_sesion;
+
+      await this.auditoria.registrar({
+        eleccion_id: aula.eleccion_id,
+        actor_tipo: 'DOCENTE',
+        actor_id: actorId,
+        accion: 'EMPAREJAR_MAQUINA_DINAMICA',
+        entidad: 'puesto',
+        entidad_id: nuevoPuesto.id,
+        datos_despues: {
+          aula: aula.nombre,
+          numero_puesto: nuevoPuesto.numero_puesto,
+          estado: 'LIBRE',
+        },
+        ip,
+      });
+
+      return {
+        puesto_id: nuevoPuesto.id,
+        numero_puesto: nuevoPuesto.numero_puesto,
+        aula_id: aula.id,
+        aula_nombre: aula.nombre,
+        token_sesion,
+        estado: nuevoPuesto.estado,
+      };
+    }
+
+    // 2. Flujo persistente en base de datos (compatibilidad de tests existentes)
     const qrRecord = await this.prisma.qrEmparejamiento.findUnique({
-      where: { token: tokenQr },
+      where: { token: tokenLimpio },
       include: { puesto: { include: { aula: true } } },
     });
 
@@ -175,6 +291,200 @@ export class PuestosService {
   }
 
   /**
+   * Administrador: Autoriza y vincula cualquier máquina con código QR a un aula y puesto específico.
+   */
+  async emparejarPuestoAdmin(
+    aulaId: string,
+    tokenQr: string,
+    numeroPuesto?: number,
+    actorId = 'admin',
+    ip = '127.0.0.1',
+  ) {
+    const aula = await this.prisma.aula.findUnique({ where: { id: aulaId } });
+    if (!aula) {
+      throw new NotFoundException(`Aula con ID ${aulaId} no encontrada`);
+    }
+
+    const tokenLimpio = tokenQr.trim();
+
+    // 1. Si es del flujo dinámico (sin mesa predeterminada)
+    if (this.maquinasPendientes.has(tokenLimpio)) {
+      const maquina = this.maquinasPendientes.get(tokenLimpio)!;
+      if (maquina.usado) {
+        throw new BadRequestException('Esta máquina ya fue autorizada y asignada a una mesa.');
+      }
+      if (maquina.expires_at < new Date()) {
+        throw new BadRequestException('El código de vinculación ha expirado. Genere uno nuevo.');
+      }
+
+      let numPuestoFinal = numeroPuesto;
+      if (!numPuestoFinal) {
+        const maxPuesto = await this.prisma.puesto.aggregate({
+          where: { aula_id: aulaId },
+          _max: { numero_puesto: true },
+        });
+        numPuestoFinal = (maxPuesto._max.numero_puesto || 0) + 1;
+      }
+
+      const token_sesion = crypto.randomUUID();
+      const nuevoPuesto = await this.prisma.puesto.create({
+        data: {
+          aula_id: aulaId,
+          numero_puesto: numPuestoFinal,
+          estado: 'LIBRE',
+          token_sesion,
+          ultimo_heartbeat: new Date(),
+        },
+      });
+
+      maquina.usado = true;
+      maquina.puesto_id = nuevoPuesto.id;
+      maquina.aula_id = aula.id;
+      maquina.aula_nombre = aula.nombre;
+      maquina.numero_puesto = nuevoPuesto.numero_puesto;
+      maquina.token_sesion = token_sesion;
+
+      await this.auditoria.registrar({
+        eleccion_id: aula.eleccion_id,
+        actor_tipo: 'ADMIN',
+        actor_id: actorId,
+        accion: 'AUTORIZAR_MAQUINA_ADMIN',
+        entidad: 'puesto',
+        entidad_id: nuevoPuesto.id,
+        datos_despues: {
+          aula: aula.nombre,
+          numero_puesto: numPuestoFinal,
+          estado: 'LIBRE',
+        },
+        ip,
+      });
+
+      return {
+        puesto_id: nuevoPuesto.id,
+        numero_puesto: nuevoPuesto.numero_puesto,
+        aula_id: aula.id,
+        aula_nombre: aula.nombre,
+        token_sesion,
+        estado: nuevoPuesto.estado,
+      };
+    }
+
+    const qrRecord = await this.prisma.qrEmparejamiento.findUnique({
+      where: { token: tokenLimpio },
+      include: { puesto: { include: { aula: true } } },
+    });
+
+    if (!qrRecord) {
+      throw new NotFoundException('Código de máquina o QR no encontrado.');
+    }
+
+    if (qrRecord.usado) {
+      throw new BadRequestException('Esta máquina ya fue autorizada anteriormente.');
+    }
+
+    if (qrRecord.expires_at < new Date()) {
+      throw new BadRequestException('El código de vinculación ha expirado. Genere uno nuevo en la máquina.');
+    }
+
+    let numPuestoFinal = numeroPuesto;
+    if (!numPuestoFinal) {
+      const maxPuesto = await this.prisma.puesto.aggregate({
+        where: { aula_id: aulaId },
+        _max: { numero_puesto: true },
+      });
+      numPuestoFinal = (maxPuesto._max.numero_puesto || 0) + 1;
+    }
+
+    // Limpiar habilitaciones previas
+    await this.prisma.habilitacion.deleteMany({
+      where: { puesto_id: qrRecord.puesto_id },
+    });
+    this.limpiarTokenVotoPuesto(qrRecord.puesto_id);
+
+    // Marcar QR como usado
+    await this.prisma.qrEmparejamiento.update({
+      where: { id: qrRecord.id },
+      data: { usado: true },
+    });
+
+    const token_sesion = crypto.randomUUID();
+    const puestoActualizado = await this.prisma.puesto.update({
+      where: { id: qrRecord.puesto_id },
+      data: {
+        aula_id: aulaId,
+        numero_puesto: numPuestoFinal,
+        estado: 'LIBRE',
+        token_sesion,
+        ultimo_heartbeat: new Date(),
+      },
+    });
+
+    await this.auditoria.registrar({
+      eleccion_id: aula.eleccion_id,
+      actor_tipo: 'ADMIN',
+      actor_id: actorId,
+      accion: 'AUTORIZAR_MAQUINA_ADMIN',
+      entidad: 'puesto',
+      entidad_id: puestoActualizado.id,
+      datos_despues: {
+        aula: aula.nombre,
+        numero_puesto: numPuestoFinal,
+        estado: 'LIBRE',
+      },
+      ip,
+    });
+
+    return {
+      puesto_id: puestoActualizado.id,
+      numero_puesto: puestoActualizado.numero_puesto,
+      aula_id: puestoActualizado.aula_id,
+      aula_nombre: aula.nombre,
+      token_sesion,
+      estado: puestoActualizado.estado,
+    };
+  }
+
+  /**
+   * Administrador: Registra un nuevo puesto en un aula.
+   */
+  async agregarPuestoAula(aulaId: string, actorId = 'admin', ip = '127.0.0.1') {
+    const aula = await this.prisma.aula.findUnique({ where: { id: aulaId } });
+    if (!aula) {
+      throw new NotFoundException(`Aula con ID ${aulaId} no encontrada`);
+    }
+
+    const maxPuesto = await this.prisma.puesto.aggregate({
+      where: { aula_id: aulaId },
+      _max: { numero_puesto: true },
+    });
+    const nuevoNumero = (maxPuesto._max.numero_puesto || 0) + 1;
+
+    const puesto = await this.prisma.puesto.create({
+      data: {
+        aula_id: aulaId,
+        numero_puesto: nuevoNumero,
+        estado: 'LIBRE',
+      },
+    });
+
+    await this.auditoria.registrar({
+      eleccion_id: aula.eleccion_id,
+      actor_tipo: 'ADMIN',
+      actor_id: actorId,
+      accion: 'AGREGAR_PUESTO_AULA',
+      entidad: 'puesto',
+      entidad_id: puesto.id,
+      datos_despues: {
+        aula: aula.nombre,
+        numero_puesto: nuevoNumero,
+      },
+      ip,
+    });
+
+    return puesto;
+  }
+
+  /**
    * Puesto: Envía señal periódica "sigo vivo" (heartbeat).
    * Si el puesto estaba FUERA_SERVICIO y reconecta, vuelve a LIBRE.
    */
@@ -207,6 +517,7 @@ export class PuestosService {
 
   /**
    * Monitor de vida de puestos: Puestos sin heartbeat por > 30s pasan a FUERA_SERVICIO.
+   * Puestos con reserva activa se mantienen en RESERVADO.
    */
   async verificarInactivosPorAula(aulaId: string) {
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -221,21 +532,25 @@ export class PuestosService {
       resolvedAulaId = aulaDefault.id;
     }
 
-    const limiteInactividad = new Date(Date.now() - 30 * 1000); // 30 segundos
+    const ahora = new Date();
+    const limiteInactividad = new Date(ahora.getTime() - 30 * 1000); // 30 segundos
 
-    await this.prisma.puesto.updateMany({
-      where: {
-        aula_id: resolvedAulaId,
-        estado: { not: 'FUERA_SERVICIO' },
-        OR: [
-          { ultimo_heartbeat: null },
-          { ultimo_heartbeat: { lt: limiteInactividad } },
-        ],
-      },
-      data: {
-        estado: 'FUERA_SERVICIO',
-      },
-    });
+    // 1. Puestos que no han dado heartbeat pasan a FUERA_SERVICIO siempre que no tengan reserva activa
+    await this.prisma.$executeRaw`
+      UPDATE puesto
+      SET estado = 'FUERA_SERVICIO'
+      WHERE aula_id = ${resolvedAulaId}::uuid
+        AND (ultimo_heartbeat IS NULL OR ultimo_heartbeat < ${limiteInactividad})
+        AND id NOT IN (SELECT puesto_id FROM habilitacion WHERE expires_at > ${ahora});
+    `;
+
+    // 2. Asegurar que puestos con reserva vigente se muestren como RESERVADO
+    await this.prisma.$executeRaw`
+      UPDATE puesto
+      SET estado = 'RESERVADO'
+      WHERE aula_id = ${resolvedAulaId}::uuid
+        AND id IN (SELECT puesto_id FROM habilitacion WHERE expires_at > ${ahora});
+    `;
 
     return this.prisma.puesto.findMany({
       where: { aula_id: resolvedAulaId },
@@ -247,8 +562,37 @@ export class PuestosService {
    * Kiosco: Consulta periódica para verificar si el docente ya escaneó/aprobó el código QR.
    */
   async verificarEstadoQr(tokenQr: string) {
+    const tokenLimpio = tokenQr.trim();
+
+    // 1. Verificar si está en memoria (flujo dinámico donde la máquina toma lugar al escanearse)
+    if (this.maquinasPendientes.has(tokenLimpio)) {
+      const maquina = this.maquinasPendientes.get(tokenLimpio)!;
+
+      if (maquina.expires_at < new Date()) {
+        return { status: 'EXPIRED', message: 'El código QR ha expirado. Genere uno nuevo.' };
+      }
+
+      if (!maquina.usado) {
+        return {
+          status: 'PENDING',
+          message: 'Esperando escaneo y autorización del docente o administrador...',
+          expires_at: maquina.expires_at,
+        };
+      }
+
+      return {
+        status: 'APPROVED',
+        puesto_id: maquina.puesto_id,
+        numero_puesto: maquina.numero_puesto,
+        aula_id: maquina.aula_id,
+        aula_nombre: maquina.aula_nombre,
+        token_sesion: maquina.token_sesion,
+        estado: 'LIBRE',
+      };
+    }
+
     const qrRecord = await this.prisma.qrEmparejamiento.findUnique({
-      where: { token: tokenQr },
+      where: { token: tokenLimpio },
       include: {
         puesto: {
           include: {
@@ -303,17 +647,35 @@ export class PuestosService {
       throw new UnauthorizedException('Token de sesión no válido para este puesto.');
     }
 
-    // Actualizar heartbeat en tiempo real
-    const nuevoEstado = puesto.estado === 'FUERA_SERVICIO' ? 'LIBRE' : puesto.estado;
-    await this.prisma.puesto.update({
-      where: { id: puestoId },
-      data: {
-        ultimo_heartbeat: new Date(),
-        estado: nuevoEstado,
+    const ahora = new Date();
+
+    // Consultar si hay una habilitación activa no vencida para este puesto
+    const habilitacion = await this.prisma.habilitacion.findFirst({
+      where: {
+        puesto_id: puestoId,
+        expires_at: { gt: ahora },
       },
     });
 
-    const token_voto = this.tokensVotoPorPuesto.get(puestoId);
+    let nuevoEstado: 'LIBRE' | 'RESERVADO' | 'FUERA_SERVICIO';
+    let token_voto: string | null = null;
+
+    if (habilitacion) {
+      nuevoEstado = 'RESERVADO';
+      token_voto = habilitacion.token_voto || this.tokensVotoPorPuesto.get(puestoId) || null;
+    } else {
+      nuevoEstado = 'LIBRE';
+      this.limpiarTokenVotoPuesto(puestoId);
+    }
+
+    // Actualizar heartbeat en tiempo real y asegurar el estado
+    await this.prisma.puesto.update({
+      where: { id: puestoId },
+      data: {
+        ultimo_heartbeat: ahora,
+        estado: nuevoEstado,
+      },
+    });
 
     return {
       ok: true,
@@ -321,7 +683,7 @@ export class PuestosService {
       numero_puesto: puesto.numero_puesto,
       aula_nombre: puesto.aula.nombre,
       estado: nuevoEstado,
-      token_voto: nuevoEstado === 'RESERVADO' ? token_voto : null,
+      token_voto,
     };
   }
 

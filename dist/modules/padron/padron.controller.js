@@ -33,6 +33,9 @@ let PadronController = class PadronController {
     async pantallaPuerta(aulaId) {
         return this.padronService.obtenerParaPantallaPuerta(aulaId);
     }
+    async obtenerSalonDocente(aulaId) {
+        return this.padronService.obtenerSalonDocente(aulaId);
+    }
 };
 exports.PadronController = PadronController;
 __decorate([
@@ -70,6 +73,13 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], PadronController.prototype, "pantallaPuerta", null);
+__decorate([
+    (0, common_1.Get)('api/docente/aula/:aulaId/salon'),
+    __param(0, (0, common_1.Param)('aulaId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], PadronController.prototype, "obtenerSalonDocente", null);
 exports.PadronController = PadronController = __decorate([
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [padron_service_1.PadronService])

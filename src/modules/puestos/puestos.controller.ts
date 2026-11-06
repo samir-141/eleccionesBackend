@@ -52,6 +52,25 @@ export class PuestosController {
     return this.puestosService.emparejarConQr(docenteAulaId, dto.token_qr, actorId, ip);
   }
 
+  @Post('api/admin/aulas/:aulaId/puestos/autorizar-maquina')
+  async autorizarMaquinaAdmin(
+    @Param('aulaId') aulaId: string,
+    @Body() body: { token_qr: string; numero_puesto?: number },
+    @Headers('x-actor-id') actorId = 'admin',
+    @Ip() ip: string,
+  ) {
+    return this.puestosService.emparejarPuestoAdmin(aulaId, body.token_qr, body.numero_puesto, actorId, ip);
+  }
+
+  @Post('api/admin/aulas/:aulaId/puestos')
+  async agregarPuestoAdmin(
+    @Param('aulaId') aulaId: string,
+    @Headers('x-actor-id') actorId = 'admin',
+    @Ip() ip: string,
+  ) {
+    return this.puestosService.agregarPuestoAula(aulaId, actorId, ip);
+  }
+
   @Post('api/puesto/heartbeat')
   async heartbeat(@Body() dto: HeartbeatDto) {
     return this.puestosService.registrarHeartbeat(dto.token_sesion);

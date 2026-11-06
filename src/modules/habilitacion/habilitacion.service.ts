@@ -152,6 +152,7 @@ export class HabilitacionService {
     rawDocenteAulaId: string,
     docenteId: string,
     electorId: string,
+    puestoIdDeseado?: string,
     ip = '127.0.0.1',
   ) {
     const docenteAulaId = await this.resolverAulaId(rawDocenteAulaId);
@@ -161,16 +162,35 @@ export class HabilitacionService {
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Bloqueo de fila para encontrar 1 puesto libre en el aula (ADR-006)
-      const puestosLibres = await tx.$queryRaw<Array<{ id: string; numero_puesto: number }>>`
-        SELECT id, numero_puesto 
-        FROM puesto 
-        WHERE aula_id = ${docenteAulaId}::uuid AND estado = 'LIBRE'
-        ORDER BY numero_puesto ASC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED;
-      `;
+      let puestosLibres: Array<{ id: string; numero_puesto: number }>;
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+      if (puestoIdDeseado && UUID_REGEX.test(puestoIdDeseado)) {
+        puestosLibres = await tx.$queryRaw<Array<{ id: string; numero_puesto: number }>>`
+          SELECT id, numero_puesto 
+          FROM puesto 
+          WHERE id = ${puestoIdDeseado}::uuid AND aula_id = ${docenteAulaId}::uuid AND estado = 'LIBRE'
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED;
+        `;
+      } else {
+        puestosLibres = await tx.$queryRaw<Array<{ id: string; numero_puesto: number }>>`
+          SELECT id, numero_puesto 
+          FROM puesto 
+          WHERE aula_id = ${docenteAulaId}::uuid AND estado = 'LIBRE'
+          ORDER BY numero_puesto ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED;
+        `;
+      }
 
       if (!puestosLibres || puestosLibres.length === 0) {
+        const totalPuestosAula = await tx.puesto.count({ where: { aula_id: docenteAulaId } });
+        if (totalPuestosAula === 0) {
+          throw new ConflictException(
+            'No hay máquinas de votación vinculadas a esta aula. Primero vincule una máquina escaneando su código QR.',
+          );
+        }
         throw new ConflictException(
           'Todos los puestos de votación de esta aula están ocupados o reservados en este momento. Por favor espere a que se libere un puesto.',
         );
@@ -221,16 +241,38 @@ export class HabilitacionService {
         WHERE id = ${elector.id}::uuid;
       `;
 
-      // 7. Sanitizar y limpiar cualquier habilitación previa huérfana en este puesto o elector
-      await tx.$executeRaw`
-        DELETE FROM habilitacion 
-        WHERE puesto_id = ${puestoAsignado.id}::uuid OR elector_id = ${elector.id}::uuid;
-      `;
+      // 7. Sanitizar cualquier elector previo en este puesto que pudiera haber quedado colgado
+      const habsPrevias = await tx.habilitacion.findMany({
+        where: {
+          OR: [
+            { puesto_id: puestoAsignado.id },
+            { elector_id: elector.id },
+          ],
+        },
+      });
+
+      for (const hp of habsPrevias) {
+        if (hp.elector_id !== elector.id) {
+          await tx.elector.update({
+            where: { id: hp.elector_id },
+            data: { estado: 'PENDIENTE' },
+          });
+        }
+      }
+
+      await tx.habilitacion.deleteMany({
+        where: {
+          OR: [
+            { puesto_id: puestoAsignado.id },
+            { elector_id: elector.id },
+          ],
+        },
+      });
 
       // 8. Insertar habilitación transitoria (Invariante I5)
       await tx.$executeRaw`
-        INSERT INTO habilitacion (id, eleccion_id, elector_id, puesto_id, token_voto_hash, expires_at)
-        VALUES (gen_random_uuid(), ${elector.eleccion_id}::uuid, ${elector.id}::uuid, ${puestoAsignado.id}::uuid, ${token_voto_hash}, ${expires_at});
+        INSERT INTO habilitacion (id, eleccion_id, elector_id, puesto_id, token_voto_hash, token_voto, expires_at)
+        VALUES (gen_random_uuid(), ${elector.eleccion_id}::uuid, ${elector.id}::uuid, ${puestoAsignado.id}::uuid, ${token_voto_hash}, ${token_voto}, ${expires_at});
       `;
 
       // 9. Registro de auditoría
@@ -387,6 +429,27 @@ export class HabilitacionService {
         // Continuar limpiando las siguientes si una ya fue procesada
       }
     }
+
+    // Auto-sanitización de estados huérfanos:
+    // 1. Devolver a PENDIENTE cualquier elector en estado HABILITADO que ya no tenga fila en habilitacion
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE elector
+        SET estado = 'PENDIENTE'
+        WHERE estado = 'HABILITADO'
+          AND id NOT IN (SELECT elector_id FROM habilitacion);
+      `;
+    } catch {}
+
+    // 2. Devolver a LIBRE cualquier puesto en estado RESERVADO que ya no tenga fila en habilitacion
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE puesto
+        SET estado = 'LIBRE'
+        WHERE estado = 'RESERVADO'
+          AND id NOT IN (SELECT puesto_id FROM habilitacion);
+      `;
+    } catch {}
   }
 }
 

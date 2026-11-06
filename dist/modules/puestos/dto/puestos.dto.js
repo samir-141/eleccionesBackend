@@ -18,11 +18,13 @@ class SolicitarEmparejamientoDto {
 exports.SolicitarEmparejamientoDto = SolicitarEmparejamientoDto;
 __decorate([
     (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], SolicitarEmparejamientoDto.prototype, "aula_id", void 0);
 __decorate([
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Number)
 ], SolicitarEmparejamientoDto.prototype, "numero_puesto", void 0);
 class EmparejarPuestoDto {

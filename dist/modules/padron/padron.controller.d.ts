@@ -56,4 +56,23 @@ export declare class PadronController {
             grado_seccion: string;
         }[];
     }>;
+    obtenerSalonDocente(aulaId: string): Promise<{
+        aula: {
+            id: string;
+            numero: number;
+            nombre: string;
+        };
+        total_asignados: number;
+        total_votaron: number;
+        total_pendientes: number;
+        porcentaje_avance: number;
+        electores: {
+            id: string;
+            estado: import(".prisma/client").$Enums.ElectorEstado;
+            dni: string;
+            nombres: string;
+            apellidos: string;
+            grado_seccion: string;
+        }[];
+    }>;
 }

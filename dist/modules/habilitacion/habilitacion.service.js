@@ -110,19 +110,36 @@ let HabilitacionService = class HabilitacionService {
             aula_nombre: aula.nombre,
         };
     }
-    async confirmarHabilitacion(rawDocenteAulaId, docenteId, electorId, ip = '127.0.0.1') {
+    async confirmarHabilitacion(rawDocenteAulaId, docenteId, electorId, puestoIdDeseado, ip = '127.0.0.1') {
         const docenteAulaId = await this.resolverAulaId(rawDocenteAulaId);
         await this.limpiarHabilitacionesExpiradas();
         return this.prisma.$transaction(async (tx) => {
-            const puestosLibres = await tx.$queryRaw `
-        SELECT id, numero_puesto 
-        FROM puesto 
-        WHERE aula_id = ${docenteAulaId}::uuid AND estado = 'LIBRE'
-        ORDER BY numero_puesto ASC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED;
-      `;
+            let puestosLibres;
+            const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            if (puestoIdDeseado && UUID_REGEX.test(puestoIdDeseado)) {
+                puestosLibres = await tx.$queryRaw `
+          SELECT id, numero_puesto 
+          FROM puesto 
+          WHERE id = ${puestoIdDeseado}::uuid AND aula_id = ${docenteAulaId}::uuid AND estado = 'LIBRE'
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED;
+        `;
+            }
+            else {
+                puestosLibres = await tx.$queryRaw `
+          SELECT id, numero_puesto 
+          FROM puesto 
+          WHERE aula_id = ${docenteAulaId}::uuid AND estado = 'LIBRE'
+          ORDER BY numero_puesto ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED;
+        `;
+            }
             if (!puestosLibres || puestosLibres.length === 0) {
+                const totalPuestosAula = await tx.puesto.count({ where: { aula_id: docenteAulaId } });
+                if (totalPuestosAula === 0) {
+                    throw new common_1.ConflictException('No hay máquinas de votación vinculadas a esta aula. Primero vincule una máquina escaneando su código QR.');
+                }
                 throw new common_1.ConflictException('Todos los puestos de votación de esta aula están ocupados o reservados en este momento. Por favor espere a que se libere un puesto.');
             }
             const puestoAsignado = puestosLibres[0];
@@ -155,13 +172,33 @@ let HabilitacionService = class HabilitacionService {
         SET estado = 'HABILITADO'
         WHERE id = ${elector.id}::uuid;
       `;
+            const habsPrevias = await tx.habilitacion.findMany({
+                where: {
+                    OR: [
+                        { puesto_id: puestoAsignado.id },
+                        { elector_id: elector.id },
+                    ],
+                },
+            });
+            for (const hp of habsPrevias) {
+                if (hp.elector_id !== elector.id) {
+                    await tx.elector.update({
+                        where: { id: hp.elector_id },
+                        data: { estado: 'PENDIENTE' },
+                    });
+                }
+            }
+            await tx.habilitacion.deleteMany({
+                where: {
+                    OR: [
+                        { puesto_id: puestoAsignado.id },
+                        { elector_id: elector.id },
+                    ],
+                },
+            });
             await tx.$executeRaw `
-        DELETE FROM habilitacion 
-        WHERE puesto_id = ${puestoAsignado.id}::uuid OR elector_id = ${elector.id}::uuid;
-      `;
-            await tx.$executeRaw `
-        INSERT INTO habilitacion (id, eleccion_id, elector_id, puesto_id, token_voto_hash, expires_at)
-        VALUES (gen_random_uuid(), ${elector.eleccion_id}::uuid, ${elector.id}::uuid, ${puestoAsignado.id}::uuid, ${token_voto_hash}, ${expires_at});
+        INSERT INTO habilitacion (id, eleccion_id, elector_id, puesto_id, token_voto_hash, token_voto, expires_at)
+        VALUES (gen_random_uuid(), ${elector.eleccion_id}::uuid, ${elector.id}::uuid, ${puestoAsignado.id}::uuid, ${token_voto_hash}, ${token_voto}, ${expires_at});
       `;
             await this.auditoria.registrar({
                 eleccion_id: elector.eleccion_id,
@@ -278,6 +315,24 @@ let HabilitacionService = class HabilitacionService {
             catch {
             }
         }
+        try {
+            await this.prisma.$executeRaw `
+        UPDATE elector
+        SET estado = 'PENDIENTE'
+        WHERE estado = 'HABILITADO'
+          AND id NOT IN (SELECT elector_id FROM habilitacion);
+      `;
+        }
+        catch { }
+        try {
+            await this.prisma.$executeRaw `
+        UPDATE puesto
+        SET estado = 'LIBRE'
+        WHERE estado = 'RESERVADO'
+          AND id NOT IN (SELECT puesto_id FROM habilitacion);
+      `;
+        }
+        catch { }
     }
 };
 exports.HabilitacionService = HabilitacionService;

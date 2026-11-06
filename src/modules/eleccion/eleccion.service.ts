@@ -20,13 +20,113 @@ export class EleccionService {
   ) {}
 
   async create(dto: CreateEleccionDto, actorId = 'admin', ip = '127.0.0.1') {
+    let reglasIniciales = undefined;
+    if (dto.clonarConfiguracion && dto.eleccionOrigenId) {
+      const origen = await this.prisma.eleccion.findUnique({
+        where: { id: dto.eleccionOrigenId },
+      });
+      if (origen?.reglas) {
+        reglasIniciales = origen.reglas;
+      }
+    }
+
     const eleccion = await this.prisma.eleccion.create({
       data: {
         nombre: dto.nombre,
         descripcion: dto.descripcion,
         estado: 'BORRADOR',
+        ...(reglasIniciales ? { reglas: reglasIniciales } : {}),
       },
     });
+
+    // Clonación de aulas, puestos, docentes y partidos si se solicita
+    if (dto.clonarConfiguracion && dto.eleccionOrigenId) {
+      const aulasOrigen = await this.prisma.aula.findMany({
+        where: { eleccion_id: dto.eleccionOrigenId },
+        include: { puestos: true, docentes: true },
+      });
+
+      const mapaAulas = new Map<string, string>();
+
+      for (const a of aulasOrigen) {
+        const nuevaAula = await this.prisma.aula.create({
+          data: {
+            eleccion_id: eleccion.id,
+            numero: a.numero,
+            nombre: a.nombre,
+            capacidad: a.capacidad,
+          },
+        });
+        mapaAulas.set(a.id, nuevaAula.id);
+
+        // Clonar puestos
+        if (a.puestos && a.puestos.length > 0) {
+          await this.prisma.puesto.createMany({
+            data: a.puestos.map((p) => ({
+              aula_id: nuevaAula.id,
+              numero_puesto: p.numero_puesto,
+              estado: 'LIBRE',
+            })),
+          });
+        }
+
+        // Clonar docentes
+        if (a.docentes && a.docentes.length > 0) {
+          for (const d of a.docentes) {
+            await this.prisma.docente.create({
+              data: {
+                eleccion_id: eleccion.id,
+                aula_id: nuevaAula.id,
+                username: d.username,
+                password_hash: d.password_hash,
+                totp_secret: d.totp_secret,
+                activo: true,
+              },
+            });
+          }
+        }
+      }
+
+      // Clonar partidos
+      const partidosOrigen = await this.prisma.partido.findMany({
+        where: { eleccion_id: dto.eleccionOrigenId },
+      });
+      if (partidosOrigen.length > 0) {
+        await this.prisma.partido.createMany({
+          data: partidosOrigen.map((p) => ({
+            eleccion_id: eleccion.id,
+            numero_lista: p.numero_lista,
+            nombre: p.nombre,
+            lema: p.lema,
+            logo_url: p.logo_url,
+          })),
+        });
+      }
+
+      // Clonar padrón de electores si se solicita
+      if (dto.clonarPadron) {
+        const electoresOrigen = await this.prisma.elector.findMany({
+          where: { eleccion_id: dto.eleccionOrigenId },
+        });
+
+        for (const e of electoresOrigen) {
+          const nuevaAulaId = mapaAulas.get(e.aula_id);
+          if (nuevaAulaId) {
+            await this.prisma.elector.create({
+              data: {
+                eleccion_id: eleccion.id,
+                aula_id: nuevaAulaId,
+                dni: e.dni,
+                nombres: e.nombres,
+                apellidos: e.apellidos,
+                grado_seccion: e.grado_seccion,
+                estado: 'PENDIENTE',
+              },
+            });
+          }
+        }
+      }
+    }
 
     await this.auditoria.registrar({
       eleccion_id: eleccion.id,
@@ -35,11 +135,15 @@ export class EleccionService {
       accion: 'CREAR_ELECCION',
       entidad: 'eleccion',
       entidad_id: eleccion.id,
-      datos_despues: eleccion,
+      datos_despues: {
+        id: eleccion.id,
+        nombre: eleccion.nombre,
+        clonada: Boolean(dto.clonarConfiguracion),
+      },
       ip,
     });
 
-    return eleccion;
+    return this.findOne(eleccion.id);
   }
 
   async findAll() {
@@ -242,9 +346,9 @@ export class EleccionService {
         },
         puestos: {
           total: puestosCount,
-          ok: puestosOk,
+          ok: true,
           titulo: 'Puestos de Votación',
-          mensaje: puestosOk ? `${puestosCount} puesto(s) activo(s)` : 'Configure puestos para los electores',
+          mensaje: puestosCount > 0 ? `${puestosCount} puesto(s) vinculado(s)` : 'Vinculación dinámica al escanear QR en sala',
         },
         docentes: {
           total: docentesCount,
@@ -279,7 +383,7 @@ export class EleccionService {
       throw new BadRequestException('Solo se pueden inicializar mesas cuando la elección está en BORRADOR.');
     }
 
-    // 1. Aulas y Puestos si no existen
+    // 1. Aulas si no existen (Las mesas/puestos NO vienen predeterminadas, toman lugar al escanear)
     let aula1 = await this.prisma.aula.findFirst({ where: { eleccion_id: eleccion.id, numero: 1 } });
     if (!aula1) {
       aula1 = await this.prisma.aula.create({
@@ -289,12 +393,6 @@ export class EleccionService {
           nombre: 'Mesa 1 (Pabellón A)',
           capacidad: 45,
         },
-      });
-      await this.prisma.puesto.createMany({
-        data: [
-          { aula_id: aula1.id, numero_puesto: 1, estado: 'LIBRE' },
-          { aula_id: aula1.id, numero_puesto: 2, estado: 'LIBRE' },
-        ],
       });
     }
 
@@ -307,12 +405,6 @@ export class EleccionService {
           nombre: 'Mesa 2 (Pabellón B)',
           capacidad: 45,
         },
-      });
-      await this.prisma.puesto.createMany({
-        data: [
-          { aula_id: aula2.id, numero_puesto: 1, estado: 'LIBRE' },
-          { aula_id: aula2.id, numero_puesto: 2, estado: 'LIBRE' },
-        ],
       });
     }
 
@@ -567,6 +659,44 @@ export class EleccionService {
     });
 
     return cerrada;
+  }
+
+  /**
+   * Transición: CERRADA -> ABIERTA
+   * Permite reanudar la recepción de votos en casos de extensión horaria o correcciones.
+   */
+  async reaperturarEleccion(id: string, actorId = 'admin', ip = '127.0.0.1') {
+    const eleccion = await this.findOne(id);
+
+    if (eleccion.estado !== 'CERRADA') {
+      throw new BadRequestException(
+        `Solo una elección en estado CERRADA puede ser REAPERTURADA. Estado actual: ${eleccion.estado}`,
+      );
+    }
+
+    const reaperturada = await this.prisma.eleccion.update({
+      where: { id },
+      data: {
+        estado: 'ABIERTA',
+        cerrada_at: null,
+      },
+    });
+
+    await this.auditoria.registrar({
+      eleccion_id: id,
+      actor_tipo: 'ADMIN',
+      actor_id: actorId,
+      accion: 'REAPERTURAR_ELECCION',
+      entidad: 'eleccion',
+      entidad_id: id,
+      datos_despues: {
+        estado: 'ABIERTA',
+        reaperturada_at: new Date(),
+      },
+      ip,
+    });
+
+    return reaperturada;
   }
 }
 

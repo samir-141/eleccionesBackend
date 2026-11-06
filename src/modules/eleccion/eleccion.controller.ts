@@ -86,6 +86,24 @@ export class EleccionController {
     return this.eleccionService.cerrarEleccion(id, actorId, ip);
   }
 
+  @Post(':id/reaperturar')
+  async reaperturar(
+    @Param('id') id: string,
+    @Ip() ip: string,
+    @Headers('x-actor-id') actorId = 'admin',
+  ) {
+    return this.eleccionService.reaperturarEleccion(id, actorId, ip);
+  }
+
+  @Post('nueva')
+  async crearNueva(
+    @Body() dto: CreateEleccionDto,
+    @Ip() ip: string,
+    @Headers('x-actor-id') actorId = 'admin',
+  ) {
+    return this.eleccionService.create(dto, actorId, ip);
+  }
+
   @Get(':id/auditoria')
   async getAuditoria(@Param('id') id: string) {
     return this.auditoriaService.obtenerPorEleccion(id);

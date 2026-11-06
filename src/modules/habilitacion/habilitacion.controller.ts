@@ -40,7 +40,7 @@ export class HabilitacionController {
     if (!docenteAulaId) {
       throw new BadRequestException('Cabecera x-docente-aula-id requerida para operar en el aula.');
     }
-    return this.habilitacionService.confirmarHabilitacion(docenteAulaId, actorId, dto.elector_id, ip);
+    return this.habilitacionService.confirmarHabilitacion(docenteAulaId, actorId, dto.elector_id, dto.puesto_id, ip);
   }
 
   @Post('cancelar')

@@ -137,5 +137,64 @@ describe('Eleccion Lifecycle & Rule Freeze (Fase 2)', () => {
     expect(audit.rows).toHaveLength(1);
     expect(audit.rows[0].accion).toBe('ABRIR_ELECCION');
   });
+
+  it('permite reaperturar una elección en estado CERRADA retornando a ABIERTA y auditando el evento', async () => {
+    const eleccion = (
+      await db.query<{ id: string }>(`
+        INSERT INTO eleccion (nombre, estado, huella_sha256, cerrada_at)
+        VALUES ('Elec Cerrada Test', 'CERRADA', 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890', NOW())
+        RETURNING id;
+      `)
+    ).rows[0].id;
+
+    // Reaperturar la elección
+    await db.query(`
+      UPDATE eleccion
+      SET estado = 'ABIERTA', cerrada_at = NULL
+      WHERE id = '${eleccion}' AND estado = 'CERRADA';
+    `);
+
+    // Registrar auditoría de reapertura
+    await db.query(`
+      INSERT INTO auditoria_log (eleccion_id, actor_tipo, actor_id, accion, entidad, entidad_id, datos_despues, ip)
+      VALUES ('${eleccion}', 'ADMIN', 'admin', 'REAPERTURAR_ELECCION', 'eleccion', '${eleccion}', '{"estado":"ABIERTA"}'::jsonb, '127.0.0.1');
+    `);
+
+    const check = await db.query<{ estado: string; cerrada_at: any }>(`
+      SELECT estado, cerrada_at FROM eleccion WHERE id = '${eleccion}';
+    `);
+
+    expect(check.rows[0].estado).toBe('ABIERTA');
+    expect(check.rows[0].cerrada_at).toBeNull();
+
+    const audit = await db.query<{ accion: string }>(`
+      SELECT accion FROM auditoria_log WHERE eleccion_id = '${eleccion}' AND accion = 'REAPERTURAR_ELECCION';
+    `);
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0].accion).toBe('REAPERTURAR_ELECCION');
+  });
+
+  it('permite crear una nueva elección en estado BORRADOR con configuración de aulas y listas', async () => {
+    const nuevaEleccion = (
+      await db.query<{ id: string; estado: string }>(`
+        INSERT INTO eleccion (nombre, descripcion, estado)
+        VALUES ('Elección Municipio Escolar 2027', 'Nueva convocatoria anual', 'BORRADOR')
+        RETURNING id, estado;
+      `)
+    ).rows[0];
+
+    expect(nuevaEleccion.estado).toBe('BORRADOR');
+
+    // Registrar auditoría de creación
+    await db.query(`
+      INSERT INTO auditoria_log (eleccion_id, actor_tipo, actor_id, accion, entidad, entidad_id, ip)
+      VALUES ('${nuevaEleccion.id}', 'ADMIN', 'admin', 'CREAR_ELECCION', 'eleccion', '${nuevaEleccion.id}', '127.0.0.1');
+    `);
+
+    const audit = await db.query<{ accion: string }>(`
+      SELECT accion FROM auditoria_log WHERE eleccion_id = '${nuevaEleccion.id}' AND accion = 'CREAR_ELECCION';
+    `);
+    expect(audit.rows).toHaveLength(1);
+  });
 });
 

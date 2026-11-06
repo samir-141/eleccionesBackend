@@ -154,6 +154,7 @@ model Habilitacion {
   elector_id       String   @unique @db.Uuid
   puesto_id        String   @unique @db.Uuid
   token_voto_hash  String   @unique @db.VarChar(64)
+  token_voto       String?  @db.VarChar(128)
   expires_at       DateTime @db.Timestamptz
 
   eleccion         Eleccion @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)

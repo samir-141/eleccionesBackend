@@ -27,6 +27,12 @@ let DocentesController = class DocentesController {
     async listar(eleccionId) {
         return this.docentesService.listarPorEleccion(eleccionId);
     }
+    async eliminar(id, ip, actorId = 'admin') {
+        return this.docentesService.eliminarDocente(id, actorId, ip);
+    }
+    async desvincularDocenteAula(aulaId, ip, actorId = 'admin') {
+        return this.docentesService.desvincularDocenteAula(aulaId, actorId, ip);
+    }
     async login(dto, ip) {
         return this.docentesService.login(dto, ip);
     }
@@ -49,6 +55,24 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], DocentesController.prototype, "listar", null);
+__decorate([
+    (0, common_1.Delete)('api/admin/docentes/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Ip)()),
+    __param(2, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], DocentesController.prototype, "eliminar", null);
+__decorate([
+    (0, common_1.Post)('api/admin/aulas/:aulaId/docentes/desvincular'),
+    __param(0, (0, common_1.Param)('aulaId')),
+    __param(1, (0, common_1.Ip)()),
+    __param(2, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], DocentesController.prototype, "desvincularDocenteAula", null);
 __decorate([
     (0, common_1.Post)('api/docente/auth/login'),
     __param(0, (0, common_1.Body)()),

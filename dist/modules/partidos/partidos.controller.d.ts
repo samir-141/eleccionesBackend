@@ -1,5 +1,6 @@
 import { PartidosService } from './partidos.service';
 import { CreatePartidoDto } from './dto/create-partido.dto';
+import { UpdatePartidoDto } from './dto/update-partido.dto';
 export declare class PartidosController {
     private readonly partidosService;
     constructor(partidosService: PartidosService);
@@ -10,6 +11,18 @@ export declare class PartidosController {
         numero_lista: number;
         lema: string | null;
         logo_url: string | null;
+    }>;
+    actualizar(id: string, dto: UpdatePartidoDto, ip: string, actorId?: string): Promise<{
+        id: string;
+        eleccion_id: string;
+        nombre: string;
+        numero_lista: number;
+        lema: string | null;
+        logo_url: string | null;
+    }>;
+    eliminar(id: string, ip: string, actorId?: string): Promise<{
+        ok: boolean;
+        id: string;
     }>;
     listar(eleccionId: string): Promise<{
         id: string;
@@ -29,4 +42,12 @@ export declare class PartidosController {
             logo_url: string | null;
         }[];
     }>;
+    listarDocente(): Promise<{
+        id: string;
+        eleccion_id: string;
+        nombre: string;
+        numero_lista: number;
+        lema: string | null;
+        logo_url: string | null;
+    }[]>;
 }

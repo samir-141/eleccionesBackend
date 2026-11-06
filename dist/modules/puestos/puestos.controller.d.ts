@@ -8,6 +8,7 @@ export declare class PuestosController {
         numero_puesto: number;
         aula: string;
         qr_token: string;
+        codigo_corto: string;
         qr_data_url: string;
         expires_at: Date;
     }>;
@@ -33,6 +34,16 @@ export declare class PuestosController {
         estado?: undefined;
     } | {
         status: string;
+        puesto_id: string | undefined;
+        numero_puesto: number | undefined;
+        aula_id: string | undefined;
+        aula_nombre: string | undefined;
+        token_sesion: string | undefined;
+        estado: string;
+        message?: undefined;
+        expires_at?: undefined;
+    } | {
+        status: string;
         puesto_id: string;
         numero_puesto: number;
         aula_id: string;
@@ -51,7 +62,7 @@ export declare class PuestosController {
         numero_puesto: number;
         aula_nombre: string;
         estado: "LIBRE" | "RESERVADO";
-        token_voto: string | null | undefined;
+        token_voto: string | null;
     }>;
     sincronizarGet(puestoId: string, tokenHeader: string): Promise<{
         ok: boolean;
@@ -59,7 +70,7 @@ export declare class PuestosController {
         numero_puesto: number;
         aula_nombre: string;
         estado: "LIBRE" | "RESERVADO";
-        token_voto: string | null | undefined;
+        token_voto: string | null;
     }>;
     desvincular(body: {
         puesto_id: string;
@@ -75,8 +86,35 @@ export declare class PuestosController {
         puesto_id: string;
         numero_puesto: number;
         aula_id: string;
+        aula_nombre: string;
         token_sesion: `${string}-${string}-${string}-${string}-${string}`;
         estado: import(".prisma/client").$Enums.PuestoEstado;
+    } | {
+        puesto_id: string;
+        numero_puesto: number;
+        aula_id: string;
+        token_sesion: `${string}-${string}-${string}-${string}-${string}`;
+        estado: import(".prisma/client").$Enums.PuestoEstado;
+        aula_nombre?: undefined;
+    }>;
+    autorizarMaquinaAdmin(aulaId: string, body: {
+        token_qr: string;
+        numero_puesto?: number;
+    }, actorId: string | undefined, ip: string): Promise<{
+        puesto_id: string;
+        numero_puesto: number;
+        aula_id: string;
+        aula_nombre: string;
+        token_sesion: `${string}-${string}-${string}-${string}-${string}`;
+        estado: import(".prisma/client").$Enums.PuestoEstado;
+    }>;
+    agregarPuestoAdmin(aulaId: string, actorId: string | undefined, ip: string): Promise<{
+        id: string;
+        estado: import(".prisma/client").$Enums.PuestoEstado;
+        aula_id: string;
+        numero_puesto: number;
+        token_sesion: string | null;
+        ultimo_heartbeat: Date | null;
     }>;
     heartbeat(dto: HeartbeatDto): Promise<{
         ok: boolean;

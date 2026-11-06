@@ -1,12 +1,14 @@
-import { IsInt, IsNotEmpty, IsString, IsUUID, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class SolicitarEmparejamientoDto {
   @IsUUID()
-  aula_id!: string;
+  @IsOptional()
+  aula_id?: string;
 
   @IsInt()
   @Min(1)
-  numero_puesto!: number;
+  @IsOptional()
+  numero_puesto?: number;
 }
 
 export class EmparejarPuestoDto {
