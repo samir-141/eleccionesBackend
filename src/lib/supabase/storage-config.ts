@@ -109,3 +109,4 @@ export function getBucketForCategoria(categoria: MediaCategoria): {
 export function isValidMediaCategoria(value: string): value is MediaCategoria {
   return (MEDIA_CATEGORIAS as readonly string[]).includes(value);
 }
+

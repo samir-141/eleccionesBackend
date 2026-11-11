@@ -201,3 +201,4 @@ export function getSupabasePublicClient(): SupabaseClient | null {
 
   return cachedPublicClient;
 }
+

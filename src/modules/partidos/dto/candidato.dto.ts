@@ -63,3 +63,4 @@ export class UpdateCandidatoDto {
   @IsOptional()
   foto_media_id?: string | null;
 }
+

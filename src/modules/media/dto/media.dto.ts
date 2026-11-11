@@ -73,3 +73,4 @@ export class UpdateInstitucionMediaDto {
   @IsOptional()
   banner_media_id?: string | null;
 }
+

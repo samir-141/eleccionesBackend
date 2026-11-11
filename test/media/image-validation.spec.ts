@@ -170,3 +170,4 @@ describe('ImageValidationService (Seguridad, Magic Bytes, SVG XSS e Invariante I
     expect(own.rutaArchivo).toContain(`usuarios/docente/${docenteActor.docenteId}/`);
   });
 });
+

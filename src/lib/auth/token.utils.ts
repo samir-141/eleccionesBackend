@@ -97,3 +97,4 @@ export function verifyBearerToken(authHeader?: string): VerifiedActor | null {
 
   return null;
 }
+

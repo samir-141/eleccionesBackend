@@ -175,3 +175,4 @@ export async function probeBucketReadAccess(
     return { accessible: false, error: err?.message || 'Error verificando permisos de lectura en bucket' };
   }
 }
+
