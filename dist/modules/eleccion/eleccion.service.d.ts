@@ -22,6 +22,7 @@ export declare class EleccionService {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -38,6 +39,8 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     update(id: string, dto: UpdateEleccionDto, actorId?: string, ip?: string): Promise<{
         aulas: {
@@ -54,6 +57,7 @@ export declare class EleccionService {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -70,6 +74,8 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     remove(id: string, actorId?: string, ip?: string): Promise<{
         success: boolean;
@@ -93,6 +99,8 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     })[]>;
     private readonly UUID_REGEX;
     findActiva(): Promise<{
@@ -110,6 +118,7 @@ export declare class EleccionService {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -126,6 +135,8 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     findOne(id: string): Promise<{
         aulas: {
@@ -142,6 +153,7 @@ export declare class EleccionService {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -158,6 +170,8 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     updateReglas(id: string, dto: UpdateReglasDto, actorId?: string, ip?: string): Promise<{
         id: string;
@@ -169,6 +183,8 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     validarPrecondicionesApertura(id: string): Promise<{
         eleccion_id: string;
@@ -254,6 +270,8 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     cerrarEleccion(id: string, actorId?: string, ip?: string): Promise<{
         id: string;
@@ -265,6 +283,8 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     reaperturarEleccion(id: string, actorId?: string, ip?: string): Promise<{
         id: string;
@@ -276,5 +296,7 @@ export declare class EleccionService {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
 }

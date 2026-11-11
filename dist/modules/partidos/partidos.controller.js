@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const partidos_service_1 = require("./partidos.service");
 const create_partido_dto_1 = require("./dto/create-partido.dto");
 const update_partido_dto_1 = require("./dto/update-partido.dto");
+const candidato_dto_1 = require("./dto/candidato.dto");
 let PartidosController = class PartidosController {
     partidosService;
     constructor(partidosService) {
@@ -39,6 +40,15 @@ let PartidosController = class PartidosController {
     }
     async listarDocente() {
         return this.partidosService.listarActivos();
+    }
+    async agregarCandidato(partidoId, dto, ip, actorId = 'admin') {
+        return this.partidosService.agregarCandidato(partidoId, dto, actorId, ip);
+    }
+    async actualizarCandidato(id, dto, ip, actorId = 'admin') {
+        return this.partidosService.actualizarCandidato(id, dto, actorId, ip);
+    }
+    async eliminarCandidato(id, ip, actorId = 'admin') {
+        return this.partidosService.eliminarCandidato(id, actorId, ip);
     }
 };
 exports.PartidosController = PartidosController;
@@ -91,6 +101,35 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], PartidosController.prototype, "listarDocente", null);
+__decorate([
+    (0, common_1.Post)('api/admin/partidos/:partidoId/candidatos'),
+    __param(0, (0, common_1.Param)('partidoId')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Ip)()),
+    __param(3, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, candidato_dto_1.CreateCandidatoDto, String, Object]),
+    __metadata("design:returntype", Promise)
+], PartidosController.prototype, "agregarCandidato", null);
+__decorate([
+    (0, common_1.Put)('api/admin/candidatos/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Ip)()),
+    __param(3, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, candidato_dto_1.UpdateCandidatoDto, String, Object]),
+    __metadata("design:returntype", Promise)
+], PartidosController.prototype, "actualizarCandidato", null);
+__decorate([
+    (0, common_1.Delete)('api/admin/candidatos/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Ip)()),
+    __param(2, (0, common_1.Headers)('x-actor-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], PartidosController.prototype, "eliminarCandidato", null);
 exports.PartidosController = PartidosController = __decorate([
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [partidos_service_1.PartidosService])

@@ -56,6 +56,7 @@ export declare class DocentesController {
             nombre: string;
             estado: import(".prisma/client").$Enums.EleccionEstado;
         };
+        avatar_media_id: string | null;
         token: string;
     }>;
 }

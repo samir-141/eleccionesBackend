@@ -13,6 +13,7 @@ exports.DocentesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../database/prisma.service");
 const auditoria_service_1 = require("../auditoria/auditoria.service");
+const token_utils_1 = require("../../lib/auth/token.utils");
 const argon2 = require("argon2");
 const otplib_1 = require("otplib");
 const QRCode = require("qrcode");
@@ -158,7 +159,12 @@ let DocentesService = class DocentesService {
             username: docente.username,
             aula: docente.aula,
             eleccion: docente.eleccion,
-            token: `jwt_session_docente_${docente.id}_${Date.now()}`,
+            avatar_media_id: docente.avatar_media_id,
+            token: (0, token_utils_1.issueDocenteToken)({
+                id: docente.id,
+                username: docente.username,
+                aula_id: docente.aula.id,
+            }),
         };
     }
     async listarPorEleccion(eleccionId) {

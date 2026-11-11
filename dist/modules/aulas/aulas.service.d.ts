@@ -21,9 +21,9 @@ export declare class AulasService {
         electores: {
             id: string;
             estado: import(".prisma/client").$Enums.ElectorEstado;
-            dni: string;
             nombres: string;
             apellidos: string;
+            dni: string;
             grado_seccion: string;
         }[];
         puestos: {
@@ -75,9 +75,9 @@ export declare class AulasService {
         eleccion_id: string;
         estado: import(".prisma/client").$Enums.ElectorEstado;
         aula_id: string;
-        dni: string;
         nombres: string;
         apellidos: string;
+        dni: string;
         grado_seccion: string;
     }>;
     desvincularPuestoAdmin(puestoId: string, actorId?: string, ip?: string): Promise<{

@@ -37,6 +37,7 @@ export declare class DocentesService {
             nombre: string;
             estado: import(".prisma/client").$Enums.EleccionEstado;
         };
+        avatar_media_id: string | null;
         token: string;
     }>;
     listarPorEleccion(eleccionId: string): Promise<{

@@ -10,7 +10,7 @@ import {
 import { LoginAdminDto } from './dto/admin-auth.dto';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EleccionService } from './eleccion.service';
-import * as crypto from 'crypto';
+import { issueAdminToken, verifyBearerToken } from '../../lib/auth/token.utils';
 
 @Controller('api/admin/auth')
 export class AdminAuthController {
@@ -49,7 +49,7 @@ export class AdminAuthController {
       throw new UnauthorizedException('Usuario o contraseña de administrador incorrectos.');
     }
 
-    const token = `admin_sec_${crypto.randomBytes(24).toString('hex')}`;
+    const token = issueAdminToken(adminUser);
 
     await this.auditoriaService.registrar({
       eleccion_id: eleccionId,
@@ -73,14 +73,15 @@ export class AdminAuthController {
 
   @Get('verify')
   async verify(@Headers('authorization') authHeader?: string) {
-    if (!authHeader || !authHeader.startsWith('Bearer admin_sec_')) {
+    const actor = verifyBearerToken(authHeader);
+    if (!actor || actor.rol !== 'ADMIN') {
       throw new UnauthorizedException('Token de administrador no válido o expirado.');
     }
 
     return {
       valido: true,
       user: {
-        username: 'admin',
+        username: actor.username,
         nombre: 'Administrador Electoral Institucional',
         rol: 'ADMIN',
       },

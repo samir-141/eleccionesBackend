@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreatePartidoDto {
   @IsInt()
@@ -18,6 +18,10 @@ export class CreatePartidoDto {
 
   @IsString()
   @IsOptional()
-  logo_url?: string;
+  logo_url?: string | null;
+
+  @IsUUID('4')
+  @IsOptional()
+  logo_media_id?: string | null;
 }
 

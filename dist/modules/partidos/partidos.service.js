@@ -20,6 +20,19 @@ let PartidosService = class PartidosService {
         this.prisma = prisma;
         this.auditoria = auditoria;
     }
+    async resolvePublicMediaRef(mediaId, fallbackUrl) {
+        if (mediaId === null) {
+            return { mediaId: null, publicUrl: fallbackUrl ?? null };
+        }
+        if (mediaId) {
+            const media = await this.prisma.archivoMedia.findUnique({ where: { id: mediaId } });
+            if (!media || media.es_privado || !media.url_publica) {
+                throw new common_1.BadRequestException('El archivo seleccionado no existe o pertenece a un bucket privado no apto para la cédula pública.');
+            }
+            return { mediaId: media.id, publicUrl: media.url_publica };
+        }
+        return { mediaId: undefined, publicUrl: fallbackUrl };
+    }
     async crearPartido(eleccionId, dto, actorId = 'admin', ip = '127.0.0.1') {
         const eleccion = await this.prisma.eleccion.findUnique({ where: { id: eleccionId } });
         if (!eleccion) {
@@ -34,13 +47,18 @@ let PartidosService = class PartidosService {
         if (existente) {
             throw new common_1.ConflictException(`Ya existe una lista con el número ${dto.numero_lista} en esta elección.`);
         }
+        const mediaRef = await this.resolvePublicMediaRef(dto.logo_media_id, dto.logo_url);
         const partido = await this.prisma.partido.create({
             data: {
                 eleccion_id: eleccionId,
                 numero_lista: dto.numero_lista,
                 nombre: dto.nombre,
                 lema: dto.lema,
-                logo_url: dto.logo_url,
+                logo_url: mediaRef.publicUrl ?? null,
+                ...(mediaRef.mediaId !== undefined ? { logo_media_id: mediaRef.mediaId } : {}),
+            },
+            include: {
+                candidatos: { orderBy: { orden: 'asc' } },
             },
         });
         await this.auditoria.registrar({
@@ -78,13 +96,18 @@ let PartidosService = class PartidosService {
                 throw new common_1.ConflictException(`Ya existe otra lista con el número ${dto.numero_lista}.`);
             }
         }
+        const mediaRef = await this.resolvePublicMediaRef(dto.logo_media_id, dto.logo_url);
         const actualizado = await this.prisma.partido.update({
             where: { id },
             data: {
                 ...(dto.numero_lista !== undefined ? { numero_lista: dto.numero_lista } : {}),
                 ...(dto.nombre ? { nombre: dto.nombre } : {}),
                 ...(dto.lema !== undefined ? { lema: dto.lema } : {}),
-                ...(dto.logo_url !== undefined ? { logo_url: dto.logo_url } : {}),
+                ...(mediaRef.publicUrl !== undefined ? { logo_url: mediaRef.publicUrl } : {}),
+                ...(mediaRef.mediaId !== undefined ? { logo_media_id: mediaRef.mediaId } : {}),
+            },
+            include: {
+                candidatos: { orderBy: { orden: 'asc' } },
             },
         });
         await this.auditoria.registrar({
@@ -124,9 +147,108 @@ let PartidosService = class PartidosService {
         });
         return { ok: true, id };
     }
+    async agregarCandidato(partidoId, dto, actorId = 'admin', ip = '127.0.0.1') {
+        const partido = await this.prisma.partido.findUnique({
+            where: { id: partidoId },
+            include: { eleccion: true, _count: { select: { candidatos: true } } },
+        });
+        if (!partido) {
+            throw new common_1.NotFoundException(`Partido con ID ${partidoId} no encontrado`);
+        }
+        if (partido.eleccion.estado !== 'BORRADOR') {
+            throw new common_1.BadRequestException('Solo se pueden registrar candidatos cuando la elección está en estado BORRADOR.');
+        }
+        const mediaRef = await this.resolvePublicMediaRef(dto.foto_media_id, dto.foto_url);
+        const candidato = await this.prisma.candidato.create({
+            data: {
+                eleccion_id: partido.eleccion_id,
+                partido_id: partidoId,
+                nombres: dto.nombres.trim(),
+                apellidos: dto.apellidos.trim(),
+                cargo: dto.cargo.trim(),
+                orden: dto.orden ?? partido._count.candidatos + 1,
+                foto_url: mediaRef.publicUrl ?? null,
+                ...(mediaRef.mediaId !== undefined ? { foto_media_id: mediaRef.mediaId } : {}),
+            },
+        });
+        await this.auditoria.registrar({
+            eleccion_id: partido.eleccion_id,
+            actor_tipo: 'ADMIN',
+            actor_id: actorId,
+            accion: 'AGREGAR_CANDIDATO',
+            entidad: 'candidato',
+            entidad_id: candidato.id,
+            datos_despues: candidato,
+            ip,
+        });
+        return candidato;
+    }
+    async actualizarCandidato(id, dto, actorId = 'admin', ip = '127.0.0.1') {
+        const candidato = await this.prisma.candidato.findUnique({
+            where: { id },
+            include: { eleccion: true },
+        });
+        if (!candidato) {
+            throw new common_1.NotFoundException(`Candidato con ID ${id} no encontrado`);
+        }
+        if (candidato.eleccion.estado !== 'BORRADOR') {
+            throw new common_1.BadRequestException('No se pueden editar candidatos después de abrir la elección.');
+        }
+        const mediaRef = await this.resolvePublicMediaRef(dto.foto_media_id, dto.foto_url);
+        const actualizado = await this.prisma.candidato.update({
+            where: { id },
+            data: {
+                ...(dto.nombres ? { nombres: dto.nombres.trim() } : {}),
+                ...(dto.apellidos ? { apellidos: dto.apellidos.trim() } : {}),
+                ...(dto.cargo ? { cargo: dto.cargo.trim() } : {}),
+                ...(dto.orden !== undefined ? { orden: dto.orden } : {}),
+                ...(mediaRef.publicUrl !== undefined ? { foto_url: mediaRef.publicUrl } : {}),
+                ...(mediaRef.mediaId !== undefined ? { foto_media_id: mediaRef.mediaId } : {}),
+            },
+        });
+        await this.auditoria.registrar({
+            eleccion_id: candidato.eleccion_id,
+            actor_tipo: 'ADMIN',
+            actor_id: actorId,
+            accion: 'ACTUALIZAR_CANDIDATO',
+            entidad: 'candidato',
+            entidad_id: id,
+            datos_antes: candidato,
+            datos_despues: actualizado,
+            ip,
+        });
+        return actualizado;
+    }
+    async eliminarCandidato(id, actorId = 'admin', ip = '127.0.0.1') {
+        const candidato = await this.prisma.candidato.findUnique({
+            where: { id },
+            include: { eleccion: true },
+        });
+        if (!candidato) {
+            throw new common_1.NotFoundException(`Candidato con ID ${id} no encontrado`);
+        }
+        if (candidato.eleccion.estado !== 'BORRADOR') {
+            throw new common_1.BadRequestException('No se pueden eliminar candidatos después de abrir la elección.');
+        }
+        await this.prisma.candidato.delete({ where: { id } });
+        await this.auditoria.registrar({
+            eleccion_id: candidato.eleccion_id,
+            actor_tipo: 'ADMIN',
+            actor_id: actorId,
+            accion: 'ELIMINAR_CANDIDATO',
+            entidad: 'candidato',
+            entidad_id: id,
+            datos_antes: candidato,
+            ip,
+        });
+        return { ok: true, id };
+    }
     async listarPorEleccion(eleccionId) {
         return this.prisma.partido.findMany({
             where: { eleccion_id: eleccionId },
+            include: {
+                candidatos: { orderBy: { orden: 'asc' } },
+            },
             orderBy: { numero_lista: 'asc' },
         });
     }
@@ -149,6 +271,17 @@ let PartidosService = class PartidosService {
                 nombre: true,
                 lema: true,
                 logo_url: true,
+                candidatos: {
+                    orderBy: { orden: 'asc' },
+                    take: 2,
+                    select: {
+                        id: true,
+                        nombres: true,
+                        apellidos: true,
+                        cargo: true,
+                        foto_url: true,
+                    },
+                },
             },
         });
         const shuffledPartidos = [...partidos];
@@ -166,6 +299,7 @@ let PartidosService = class PartidosService {
                     nombre: 'VOTO EN BLANCO',
                     lema: 'No respaldar a ninguna lista candidata',
                     logo_url: null,
+                    candidatos: [],
                 },
             ],
         };

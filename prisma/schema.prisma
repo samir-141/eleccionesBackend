@@ -36,16 +36,21 @@ model Eleccion {
   created_at      DateTime       @default(now()) @db.Timestamptz
   abierta_at      DateTime?      @db.Timestamptz
   cerrada_at      DateTime?      @db.Timestamptz
+  banner_url      String?        @db.Text
+  banner_media_id String?        @db.Uuid
 
+  banner_media    ArchivoMedia?  @relation("EleccionBannerMedia", fields: [banner_media_id], references: [id], onDelete: SetNull)
   aulas           Aula[]
   docentes        Docente[]
   partidos        Partido[]
+  candidatos      Candidato[]
   electores       Elector[]
   habilitaciones  Habilitacion[]
   urnas           Urna[]
   auditorias      AuditoriaLog[]
   incidentes      Incidente[]
   escrutinio      ResultadoEscrutinio?
+  archivos_media  ArchivoMedia[] @relation("EleccionMediaAssets")
 
   @@map("eleccion")
 }
@@ -68,36 +73,60 @@ model Aula {
 }
 
 model Docente {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  aula_id       String   @db.Uuid
-  eleccion_id   String   @db.Uuid
-  username      String   @db.VarChar(50)
-  password_hash String   @db.VarChar(255)
-  totp_secret   String   @db.VarChar(64)
-  activo        Boolean  @default(true)
-  created_at    DateTime @default(now()) @db.Timestamptz
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aula_id         String        @db.Uuid
+  eleccion_id     String        @db.Uuid
+  username        String        @db.VarChar(50)
+  password_hash   String        @db.VarChar(255)
+  totp_secret     String        @db.VarChar(64)
+  activo          Boolean       @default(true)
+  avatar_media_id String?       @db.Uuid
+  created_at      DateTime      @default(now()) @db.Timestamptz
 
-  aula          Aula     @relation(fields: [aula_id], references: [id], onDelete: Restrict)
-  eleccion      Eleccion @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
-  incidentes    Incidente[]
+  aula            Aula          @relation(fields: [aula_id], references: [id], onDelete: Restrict)
+  eleccion        Eleccion      @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  avatar_media    ArchivoMedia? @relation("DocenteAvatarMedia", fields: [avatar_media_id], references: [id], onDelete: SetNull)
+  incidentes      Incidente[]
 
   @@unique([eleccion_id, username], name: "uq_docente_username_eleccion")
   @@map("docente")
 }
 
 model Partido {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eleccion_id  String    @db.Uuid
-  numero_lista Int
-  nombre       String    @db.VarChar(120)
-  lema         String?   @db.VarChar(255)
-  logo_url     String?   @db.Text
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id   String        @db.Uuid
+  numero_lista  Int
+  nombre        String        @db.VarChar(120)
+  lema          String?       @db.VarChar(255)
+  logo_url      String?       @db.Text
+  logo_media_id String?       @db.Uuid
 
-  eleccion     Eleccion  @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
-  escrutinio   ResultadoEscrutinio[]
+  eleccion      Eleccion      @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  logo_media    ArchivoMedia? @relation("PartidoLogoMedia", fields: [logo_media_id], references: [id], onDelete: SetNull)
+  candidatos    Candidato[]
+  escrutinio    ResultadoEscrutinio[]
 
   @@unique([eleccion_id, numero_lista], name: "uq_partido_eleccion_lista")
   @@map("partido")
+}
+
+model Candidato {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eleccion_id   String        @db.Uuid
+  partido_id    String        @db.Uuid
+  nombres       String        @db.VarChar(100)
+  apellidos     String        @db.VarChar(100)
+  cargo         String        @db.VarChar(100)
+  orden         Int           @default(1)
+  foto_url      String?       @db.Text
+  foto_media_id String?       @db.Uuid
+  created_at    DateTime      @default(now()) @db.Timestamptz
+
+  eleccion      Eleccion      @relation(fields: [eleccion_id], references: [id], onDelete: Cascade)
+  partido       Partido       @relation(fields: [partido_id], references: [id], onDelete: Cascade)
+  foto_media    ArchivoMedia? @relation("CandidatoFotoMedia", fields: [foto_media_id], references: [id], onDelete: SetNull)
+
+  @@map("candidato")
 }
 
 model Puesto {
@@ -232,4 +261,58 @@ model ResultadoEscrutinio {
 
   @@map("resultado_escrutinio")
 }
+
+model ConfiguracionInstitucional {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clave              String        @unique @default("global") @db.VarChar(50)
+  nombre_institucion String        @default("Municipio Estudiantil") @db.VarChar(150)
+  subtitulo          String        @default("Sistema Electoral Escolar") @db.VarChar(200)
+  titulo_portada     String        @default("Elecciones de Municipio Escolar 2026") @db.VarChar(200)
+  logo_url           String?       @db.Text
+  logo_media_id      String?       @db.Uuid
+  banner_url         String?       @db.Text
+  banner_media_id    String?       @db.Uuid
+  updated_at         DateTime      @default(now()) @updatedAt @db.Timestamptz
+
+  logo_media         ArchivoMedia? @relation("InstitucionLogoMedia", fields: [logo_media_id], references: [id], onDelete: SetNull)
+  banner_media       ArchivoMedia? @relation("InstitucionBannerMedia", fields: [banner_media_id], references: [id], onDelete: SetNull)
+
+  @@map("configuracion_institucional")
+}
+
+model ArchivoMedia {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre_original String   @db.VarChar(255)
+  nombre_interno  String   @unique @db.VarChar(255)
+  bucket          String   @db.VarChar(100)
+  ruta_archivo    String   @db.VarChar(500)
+  url_publica     String?  @db.Text
+  es_privado      Boolean  @default(false)
+  mime_type       String   @db.VarChar(100)
+  tamano_bytes    Int
+  checksum_sha256 String?  @db.VarChar(64)
+  categoria       String   @db.VarChar(50)
+  entidad_tipo    String?  @db.VarChar(50)
+  entidad_id      String?  @db.VarChar(64)
+  eleccion_id     String?  @db.Uuid
+  subido_por      String   @db.VarChar(64)
+  alt_text        String?  @db.VarChar(255)
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  eleccion             Eleccion?                    @relation("EleccionMediaAssets", fields: [eleccion_id], references: [id], onDelete: SetNull)
+  eleccion_banners     Eleccion[]                   @relation("EleccionBannerMedia")
+  partidos_logo        Partido[]                    @relation("PartidoLogoMedia")
+  candidatos_foto      Candidato[]                  @relation("CandidatoFotoMedia")
+  docentes_avatar      Docente[]                    @relation("DocenteAvatarMedia")
+  institucion_logos    ConfiguracionInstitucional[] @relation("InstitucionLogoMedia")
+  institucion_banners  ConfiguracionInstitucional[] @relation("InstitucionBannerMedia")
+
+  @@unique([bucket, ruta_archivo], name: "uq_archivo_media_bucket_ruta")
+  @@index([categoria], name: "idx_archivo_media_categoria")
+  @@index([eleccion_id], name: "idx_archivo_media_eleccion")
+  @@index([entidad_tipo, entidad_id], name: "idx_archivo_media_entidad")
+  @@map("archivo_media")
+}
+
 

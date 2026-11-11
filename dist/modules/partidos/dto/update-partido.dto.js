@@ -16,6 +16,7 @@ class UpdatePartidoDto {
     nombre;
     lema;
     logo_url;
+    logo_media_id;
 }
 exports.UpdatePartidoDto = UpdatePartidoDto;
 __decorate([
@@ -40,6 +41,11 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], UpdatePartidoDto.prototype, "logo_url", void 0);
+__decorate([
+    (0, class_validator_1.IsUUID)('4'),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Object)
+], UpdatePartidoDto.prototype, "logo_media_id", void 0);
 //# sourceMappingURL=update-partido.dto.js.map

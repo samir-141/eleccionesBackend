@@ -1,9 +1,28 @@
 import { z } from 'zod';
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
 import * as path from 'path';
 
-// Cargar .env de backend si no está en proceso
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Cargar variables en orden seguro sin sobrescribir variables ya definidas en el proceso:
+// 1. backend/.env.local (prioridad en desarrollo local)
+// 2. backend/.env
+// 3. .env.local en la raíz del proyecto (compatibilidad si se define ahí)
+const candidateEnvPaths = [
+  path.resolve(__dirname, '../../.env.local'),
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(__dirname, '../../../.env.local'),
+];
+
+for (const envPath of candidateEnvPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: false });
+  }
+}
+
+const optionalNonEmptyString = z.preprocess(
+  (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+  z.string().optional(),
+);
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -16,6 +35,25 @@ const envSchema = z.object({
   TOTP_SERVICE_NAME: z.string().default('Elecciones Escolares'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   REDIS_URL: z.string().url().optional(),
+
+  // Supabase Storage (opcionales para permitir arranque e inspección diagnóstica clara si faltan)
+  SUPABASE_URL: optionalNonEmptyString,
+  NEXT_PUBLIC_SUPABASE_URL: optionalNonEmptyString,
+  SUPABASE_ANON_KEY: optionalNonEmptyString,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: optionalNonEmptyString,
+  SUPABASE_SERVICE_ROLE_KEY: optionalNonEmptyString,
+  SUPABASE_BUCKET_PUBLIC: z.string().default('elecciones-media'),
+  SUPABASE_BUCKET_PRIVATE: z.string().default('elecciones-privado'),
+  MAX_IMAGE_SIZE_BYTES: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .refine((n) => !Number.isNaN(n) && n > 0, { message: 'MAX_IMAGE_SIZE_BYTES debe ser un entero positivo' })
+    .default('5242880'),
+  SUPABASE_SIGNED_URL_TTL_SECONDS: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .refine((n) => !Number.isNaN(n) && n >= 30, { message: 'SUPABASE_SIGNED_URL_TTL_SECONDS debe ser al menos 30s' })
+    .default('300'),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -33,4 +71,3 @@ export function validateEnv(): EnvConfig {
 }
 
 export const env = validateEnv();
-

@@ -34,9 +34,9 @@ export declare class PadronController {
             eleccion_id: string;
             estado: import(".prisma/client").$Enums.ElectorEstado;
             aula_id: string;
-            dni: string;
             nombres: string;
             apellidos: string;
+            dni: string;
             grado_seccion: string;
         })[];
     }>;
@@ -69,9 +69,9 @@ export declare class PadronController {
         electores: {
             id: string;
             estado: import(".prisma/client").$Enums.ElectorEstado;
-            dni: string;
             nombres: string;
             apellidos: string;
+            dni: string;
             grado_seccion: string;
         }[];
     }>;

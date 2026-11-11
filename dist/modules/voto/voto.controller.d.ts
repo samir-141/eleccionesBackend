@@ -8,6 +8,13 @@ export declare class VotoController {
         opciones: {
             id: string;
             nombre: string;
+            candidatos: {
+                id: string;
+                nombres: string;
+                apellidos: string;
+                cargo: string;
+                foto_url: string | null;
+            }[];
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;

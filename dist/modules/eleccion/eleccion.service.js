@@ -83,17 +83,33 @@ let EleccionService = class EleccionService {
             }
             const partidosOrigen = await this.prisma.partido.findMany({
                 where: { eleccion_id: dto.eleccionOrigenId },
+                include: { candidatos: true },
             });
-            if (partidosOrigen.length > 0) {
-                await this.prisma.partido.createMany({
-                    data: partidosOrigen.map((p) => ({
+            for (const p of partidosOrigen) {
+                const nuevoPartido = await this.prisma.partido.create({
+                    data: {
                         eleccion_id: eleccion.id,
                         numero_lista: p.numero_lista,
                         nombre: p.nombre,
                         lema: p.lema,
                         logo_url: p.logo_url,
-                    })),
+                        logo_media_id: p.logo_media_id,
+                    },
                 });
+                if (p.candidatos && p.candidatos.length > 0) {
+                    await this.prisma.candidato.createMany({
+                        data: p.candidatos.map((c) => ({
+                            eleccion_id: eleccion.id,
+                            partido_id: nuevoPartido.id,
+                            nombres: c.nombres,
+                            apellidos: c.apellidos,
+                            cargo: c.cargo,
+                            orden: c.orden,
+                            foto_url: c.foto_url,
+                            foto_media_id: c.foto_media_id,
+                        })),
+                    });
+                }
             }
             if (dto.clonarPadron) {
                 const electoresOrigen = await this.prisma.elector.findMany({
@@ -210,8 +226,13 @@ let EleccionService = class EleccionService {
             }
             await tx.elector.deleteMany({ where: { eleccion_id: id } });
             await tx.docente.deleteMany({ where: { eleccion_id: id } });
+            await tx.candidato.deleteMany({ where: { eleccion_id: id } });
             await tx.partido.deleteMany({ where: { eleccion_id: id } });
             await tx.aula.deleteMany({ where: { eleccion_id: id } });
+            await tx.archivoMedia.updateMany({
+                where: { eleccion_id: id },
+                data: { eleccion_id: null },
+            });
             await tx.auditoriaLog.deleteMany({ where: { eleccion_id: id } });
             await tx.eleccion.delete({ where: { id } });
         });

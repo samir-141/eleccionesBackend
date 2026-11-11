@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateDocenteDto, LoginDocenteDto } from './dto/create-docente.dto';
+import { issueDocenteToken } from '../../lib/auth/token.utils';
 import * as argon2 from 'argon2';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
@@ -196,7 +197,12 @@ export class DocentesService {
       username: docente.username,
       aula: docente.aula,
       eleccion: docente.eleccion,
-      token: `jwt_session_docente_${docente.id}_${Date.now()}`,
+      avatar_media_id: docente.avatar_media_id,
+      token: issueDocenteToken({
+        id: docente.id,
+        username: docente.username,
+        aula_id: docente.aula.id,
+      }),
     };
   }
 

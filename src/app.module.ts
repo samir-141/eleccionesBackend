@@ -10,6 +10,7 @@ import { PuestosModule } from './modules/puestos/puestos.module';
 import { HabilitacionModule } from './modules/habilitacion/habilitacion.module';
 import { VotoModule } from './modules/voto/voto.module';
 import { EscrutinioModule } from './modules/escrutinio/escrutinio.module';
+import { MediaModule } from './modules/media/media.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { EscrutinioModule } from './modules/escrutinio/escrutinio.module';
     HabilitacionModule,
     VotoModule,
     EscrutinioModule,
+    MediaModule,
   ],
   controllers: [],
   providers: [],

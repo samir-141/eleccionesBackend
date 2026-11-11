@@ -22,6 +22,7 @@ export declare class EleccionController {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -38,6 +39,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     findAll(): Promise<({
         _count: {
@@ -56,6 +59,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     })[]>;
     findActiva(): Promise<{
         aulas: {
@@ -72,6 +77,7 @@ export declare class EleccionController {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -88,6 +94,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     findOne(id: string): Promise<{
         aulas: {
@@ -104,6 +112,7 @@ export declare class EleccionController {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -120,6 +129,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     update(id: string, dto: UpdateEleccionDto, ip: string, actorId?: string): Promise<{
         aulas: {
@@ -136,6 +147,7 @@ export declare class EleccionController {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -152,6 +164,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     remove(id: string, ip: string, actorId?: string): Promise<{
         success: boolean;
@@ -242,6 +256,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     abrir(id: string, ip: string, actorId?: string): Promise<{
         id: string;
@@ -253,6 +269,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     cerrar(id: string, ip: string, actorId?: string): Promise<{
         id: string;
@@ -264,6 +282,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     reaperturar(id: string, ip: string, actorId?: string): Promise<{
         id: string;
@@ -275,6 +295,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     crearNueva(dto: CreateEleccionDto, ip: string, actorId?: string): Promise<{
         aulas: {
@@ -291,6 +313,7 @@ export declare class EleccionController {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         }[];
         _count: {
             docentes: number;
@@ -307,6 +330,8 @@ export declare class EleccionController {
         huella_sha256: string | null;
         abierta_at: Date | null;
         cerrada_at: Date | null;
+        banner_url: string | null;
+        banner_media_id: string | null;
     }>;
     getAuditoria(id: string): Promise<{
         id: number;

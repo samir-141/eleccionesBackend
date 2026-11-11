@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Ip, Headers } from '@n
 import { PartidosService } from './partidos.service';
 import { CreatePartidoDto } from './dto/create-partido.dto';
 import { UpdatePartidoDto } from './dto/update-partido.dto';
+import { CreateCandidatoDto, UpdateCandidatoDto } from './dto/candidato.dto';
 
 @Controller()
 export class PartidosController {
@@ -49,6 +50,35 @@ export class PartidosController {
   @Get('api/docente/partidos')
   async listarDocente() {
     return this.partidosService.listarActivos();
+  }
+
+  @Post('api/admin/partidos/:partidoId/candidatos')
+  async agregarCandidato(
+    @Param('partidoId') partidoId: string,
+    @Body() dto: CreateCandidatoDto,
+    @Ip() ip: string,
+    @Headers('x-actor-id') actorId = 'admin',
+  ) {
+    return this.partidosService.agregarCandidato(partidoId, dto, actorId, ip);
+  }
+
+  @Put('api/admin/candidatos/:id')
+  async actualizarCandidato(
+    @Param('id') id: string,
+    @Body() dto: UpdateCandidatoDto,
+    @Ip() ip: string,
+    @Headers('x-actor-id') actorId = 'admin',
+  ) {
+    return this.partidosService.actualizarCandidato(id, dto, actorId, ip);
+  }
+
+  @Delete('api/admin/candidatos/:id')
+  async eliminarCandidato(
+    @Param('id') id: string,
+    @Ip() ip: string,
+    @Headers('x-actor-id') actorId = 'admin',
+  ) {
+    return this.partidosService.eliminarCandidato(id, actorId, ip);
   }
 }
 

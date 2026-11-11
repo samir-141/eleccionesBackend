@@ -19,6 +19,7 @@ const puestos_module_1 = require("./modules/puestos/puestos.module");
 const habilitacion_module_1 = require("./modules/habilitacion/habilitacion.module");
 const voto_module_1 = require("./modules/voto/voto.module");
 const escrutinio_module_1 = require("./modules/escrutinio/escrutinio.module");
+const media_module_1 = require("./modules/media/media.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -36,6 +37,7 @@ exports.AppModule = AppModule = __decorate([
             habilitacion_module_1.HabilitacionModule,
             voto_module_1.VotoModule,
             escrutinio_module_1.EscrutinioModule,
+            media_module_1.MediaModule,
         ],
         controllers: [],
         providers: [],

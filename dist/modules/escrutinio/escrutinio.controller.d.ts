@@ -10,6 +10,7 @@ export declare class EscrutinioController {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         } | null;
     } & {
         id: string;
@@ -36,6 +37,8 @@ export declare class EscrutinioController {
             huella_sha256: string | null;
             abierta_at: Date | null;
             cerrada_at: Date | null;
+            banner_url: string | null;
+            banner_media_id: string | null;
         };
         ganador: {
             id: string;
@@ -44,6 +47,7 @@ export declare class EscrutinioController {
             numero_lista: number;
             lema: string | null;
             logo_url: string | null;
+            logo_media_id: string | null;
         } | null;
     } & {
         id: string;
@@ -79,6 +83,7 @@ export declare class EscrutinioController {
                 numero_lista: number;
                 lema: string | null;
                 logo_url: string | null;
+                logo_media_id: string | null;
             } | null;
         } & {
             id: string;

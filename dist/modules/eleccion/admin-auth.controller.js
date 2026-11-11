@@ -17,7 +17,7 @@ const common_1 = require("@nestjs/common");
 const admin_auth_dto_1 = require("./dto/admin-auth.dto");
 const auditoria_service_1 = require("../auditoria/auditoria.service");
 const eleccion_service_1 = require("./eleccion.service");
-const crypto = require("crypto");
+const token_utils_1 = require("../../lib/auth/token.utils");
 let AdminAuthController = class AdminAuthController {
     auditoriaService;
     eleccionService;
@@ -47,7 +47,7 @@ let AdminAuthController = class AdminAuthController {
             });
             throw new common_1.UnauthorizedException('Usuario o contraseña de administrador incorrectos.');
         }
-        const token = `admin_sec_${crypto.randomBytes(24).toString('hex')}`;
+        const token = (0, token_utils_1.issueAdminToken)(adminUser);
         await this.auditoriaService.registrar({
             eleccion_id: eleccionId,
             actor_tipo: 'ADMIN',
@@ -67,13 +67,14 @@ let AdminAuthController = class AdminAuthController {
         };
     }
     async verify(authHeader) {
-        if (!authHeader || !authHeader.startsWith('Bearer admin_sec_')) {
+        const actor = (0, token_utils_1.verifyBearerToken)(authHeader);
+        if (!actor || actor.rol !== 'ADMIN') {
             throw new common_1.UnauthorizedException('Token de administrador no válido o expirado.');
         }
         return {
             valido: true,
             user: {
-                username: 'admin',
+                username: actor.username,
                 nombre: 'Administrador Electoral Institucional',
                 rol: 'ADMIN',
             },
